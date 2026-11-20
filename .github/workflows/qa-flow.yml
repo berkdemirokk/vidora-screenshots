@@ -50,7 +50,7 @@ on:
 jobs:
   flow:
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 80
     env:
       EXPO_PUBLIC_SCREENSHOT_MODE: "1"
       EXPO_PUBLIC_QA_DIAG: "1"   # Home shows a tiny poster-diag element; never in store-screens.yml
@@ -327,6 +327,11 @@ jobs:
           MP4=$(find "$DCIM" -type f \( -iname "*.mp4" -o -iname "*.mov" \) -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
           if [ -n "$MP4" ]; then cp "$MP4" out/result.mp4; else echo "no video in Photos"; fi
           DATA=$(xcrun simctl get_app_container "$UDID" com.berkdemirok.vidora data 2>/dev/null) || DATA=""
+          # The flow may stop after the render but before saving: fall back to the newest MP4 in the app's own folders.
+          if [ ! -f out/result.mp4 ] && [ -n "$DATA" ]; then
+            APPMP4=$(find "$DATA/Documents" "$DATA/Library" "$DATA/tmp" -type f -iname "*.mp4" -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
+            if [ -n "$APPMP4" ]; then cp "$APPMP4" out/result.mp4; echo "result.mp4 taken from the app container: $APPMP4"; fi
+          fi
           for dir in Library/Caches tmp Documents; do
             if [ -n "$DATA" ] && [ -d "$DATA/$dir" ]; then
               find "$DATA/$dir" -name "vidora-cutout-*.png" -exec cp {} out/cutout/ \; 2>/dev/null || true
