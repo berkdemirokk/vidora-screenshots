@@ -1,0 +1,77 @@
+# QA flow "brandkit" (Batch 4): Settings > Marka kiti. Picks an accent colour and a
+# font, saves, relaunches and checks both stayed selected, then resets the kit so
+# later flows start with template defaults. The logo picker (system photo sheet) is
+# not driven here: it can hang on the hosted simulator (see DERSLER); only its
+# button is asserted.
+#   maestro test -e OUT=qa apps/mobile/.maestro/qa-brandkit.yaml
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-settings"
+    timeout: 60000
+- tapOn:
+    id: "tab-settings"
+- scrollUntilVisible:
+    element:
+      id: "brandkit-open"
+    timeout: 20000
+- tapOn:
+    id: "brandkit-open"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: "brandkit-save"
+    timeout: 20000
+- assertVisible:
+    id: "brandkit-logo-pick"
+- takeScreenshot: ${OUT}-brand-01-empty
+- tapOn:
+    id: "brandkit-color-red"
+- tapOn:
+    id: "brandkit-font-impact"
+- takeScreenshot: ${OUT}-brand-02-chosen
+- tapOn:
+    id: "brandkit-save"
+- extendedWaitUntil:
+    visible: "Kaydedildi|Saved"
+    timeout: 10000
+
+# Relaunch: the kit is read back from app storage.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-settings"
+    timeout: 60000
+- tapOn:
+    id: "tab-settings"
+- scrollUntilVisible:
+    element:
+      id: "brandkit-open"
+    timeout: 20000
+- tapOn:
+    id: "brandkit-open"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: "brandkit-color-red"
+      selected: true
+    timeout: 20000
+- assertVisible:
+    id: "brandkit-font-impact"
+    selected: true
+- takeScreenshot: ${OUT}-brand-03-restored
+
+# Reset to template defaults.
+- tapOn:
+    id: "brandkit-color-none"
+- tapOn:
+    id: "brandkit-font-none"
+- tapOn:
+    id: "brandkit-save"
+- extendedWaitUntil:
+    visible: "Kaydedildi|Saved"
+    timeout: 10000

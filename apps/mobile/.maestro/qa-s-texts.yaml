@@ -1,0 +1,32 @@
+# Short QA run helper: every text filled (headline, price, old price, badge,
+# button text) with no assertions. Return moves between tabs; each field is
+# tapped on its own tab.
+appId: com.berkdemirok.vidora
+---
+- tapOn:
+    id: "tool-text"
+- tapOn:
+    id: "text-tab-headline"
+- tapOn:
+    id: "field-headline"
+- inputText: "Yaz Esintisi EDP"
+- tapOn:
+    id: "text-tab-price"
+- tapOn:
+    id: "field-price"
+- inputText: "899 TL"
+- tapOn:
+    id: "field-old-price"
+- inputText: "1.299 TL"
+- tapOn:
+    id: "text-tab-badge"
+- tapOn:
+    id: "field-badge"
+- inputText: "%30 indirim"
+- tapOn:
+    id: "text-tab-cta"
+- tapOn:
+    id: "field-cta"
+- eraseText: 40
+- inputText: "Şimdi keşfet"
+- takeScreenshot: ${OUT}/${NAME}-texts-filled

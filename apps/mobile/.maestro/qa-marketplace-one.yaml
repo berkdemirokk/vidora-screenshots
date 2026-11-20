@@ -1,0 +1,22 @@
+# QA helper: save one marketplace still through the "Görsel olarak kaydet"
+# sheet. Env OPTION (sheet option text), SHOT (screenshot name).
+appId: com.berkdemirok.vidora
+---
+- extendedWaitUntil:
+    notVisible: ".*görseli Fotoğraflar'a kaydedildi.*|.*image saved to Photos.*"
+    timeout: 20000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "save-image"
+    commands:
+      - tapOn:
+          id: "tool-format"
+- tapOn:
+    id: "save-image"
+- tapOn: ${OPTION}
+- extendedWaitUntil:
+    visible: ".*görseli Fotoğraflar'a kaydedildi.*|.*image saved to Photos.*"
+    timeout: 120000
+- takeScreenshot: ${OUT}/${SHOT}

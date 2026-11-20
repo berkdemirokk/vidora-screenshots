@@ -1,0 +1,6 @@
+{
+  "NSPhotoLibraryUsageDescription": "Vidora usa la foto che scegli per ritagliare il tuo prodotto e creare il suo video pubblicitario. Le foto restano sul tuo iPhone.",
+  "NSPhotoLibraryAddUsageDescription": "Vidora salva nella tua libreria foto i video che crei.",
+  "NSSpeechRecognitionUsageDescription": "Vidora usa il riconoscimento vocale per trasformare il parlato dei tuoi video in sottotitoli. Quando il riconoscimento sul dispositivo non è disponibile, l'audio può essere elaborato da Apple.",
+  "NSCameraUsageDescription": "Vidora usa la fotocamera per permetterti di fotografare il tuo prodotto e creare il suo video pubblicitario."
+}

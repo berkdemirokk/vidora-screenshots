@@ -1,0 +1,323 @@
+# QA library diagnostic: which Library taps work after a render? EVERY step is non-fatal
+# (optional / runFlow when) so the flow keeps going after each miss; a screenshot follows each
+# tap. A warned wait named "__qa_dump_libdiag_<X>__" makes Maestro dump the hierarchy of that
+# step ([H] in the plan). Every tap uses retryTapIfNoChange: false.
+#   maestro test apps/mobile/.maestro/qa-library-diag.yaml
+appId: com.berkdemirok.vidora
+---
+# ---- PART A: same app session as the render (what the store flow does) ----
+# A0
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-sample"
+    timeout: 60000
+    optional: true
+- tapOn:
+    id: "home-sample"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 30000
+    optional: true
+- repeat:
+    times: 2
+    while:
+      notVisible:
+        id: "render-button"
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: "home-sample"
+          commands:
+            - tapOn:
+                id: "home-sample"
+                retryTapIfNoChange: false
+                optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "render-button"
+          timeout: 30000
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 180000
+    optional: true
+- tapOn:
+    id: "tool-text"
+    retryTapIfNoChange: false
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "tool-background"
+    retryTapIfNoChange: false
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "tool-template"
+    retryTapIfNoChange: false
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "render-button"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "save-photos"
+    timeout: 900000
+    optional: true
+- tapOn:
+    id: "save-photos"
+    retryTapIfNoChange: false
+    optional: true
+- tapOn:
+    text: "İzin Ver|Allow|Tam Erişime İzin Ver|Allow Full Access|Fotoğraf Ekle|Add Photos Only"
+    optional: true
+- extendedWaitUntil:
+    visible: "Kaydedildi|Saved"
+    timeout: 120000
+    optional: true
+- tapOn:
+    id: "result-bar-done"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 30000
+    optional: true
+- tapOn:
+    id: "tab-library"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "library-segment"
+    timeout: 20000
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 3000
+    optional: true
+- takeScreenshot: libdiag-A0
+- extendedWaitUntil:
+    visible: "__qa_dump_libdiag_A0__"
+    timeout: 2000
+    optional: true
+
+# A1: the welcome line's dismiss button
+- tapOn:
+    id: "account-welcome-dismiss"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 3000
+    optional: true
+- takeScreenshot: libdiag-A1
+- extendedWaitUntil:
+    visible: "__qa_dump_libdiag_A1__"
+    timeout: 2000
+    optional: true
+
+# A2: select mode. Seç -> "Bitti" and a selection toolbar (tab bar hidden); a tap on the tile
+# selects it (must NOT open the video); Bitti -> "Seç" again and the tab bar back.
+- tapOn:
+    id: "library-select"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2000
+    optional: true
+- takeScreenshot: libdiag-A2
+- tapOn:
+    id: "library-tile"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 1000
+    optional: true
+- takeScreenshot: libdiag-A2b
+- tapOn:
+    id: "library-select"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2000
+    optional: true
+- takeScreenshot: libdiag-A2c
+
+# A3: segments
+- tapOn:
+    id: "library-segment-drafts"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2000
+    optional: true
+- takeScreenshot: libdiag-A3
+- tapOn:
+    id: "library-segment-videos"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2000
+    optional: true
+
+# A4: open the video
+- tapOn:
+    id: "library-tile"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 4000
+    optional: true
+- takeScreenshot: libdiag-A4
+- runFlow:
+    when:
+      visible:
+        id: "video-share"
+    commands:
+      - tapOn:
+          text: "Geri|Back"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "library-segment"
+          timeout: 10000
+          optional: true
+
+# A5: long-press menu
+- longPressOn:
+    id: "library-tile"
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2000
+    optional: true
+- takeScreenshot: libdiag-A5
+- tapOn:
+    text: "Vazgeç|Cancel"
+    optional: true
+
+# ---- PART B: fresh launch ----
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-library"
+    timeout: 60000
+    optional: true
+- tapOn:
+    id: "tab-library"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "library-segment"
+    timeout: 20000
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 3000
+    optional: true
+- takeScreenshot: libdiag-B0
+- extendedWaitUntil:
+    visible: "__qa_dump_libdiag_B0__"
+    timeout: 2000
+    optional: true
+# B1
+- runFlow:
+    when:
+      visible:
+        id: "account-welcome"
+    commands:
+      - tapOn:
+          id: "account-welcome-dismiss"
+          retryTapIfNoChange: false
+          optional: true
+      - extendedWaitUntil:
+          visible: "__qa_fixed_wait_never_present__"
+          timeout: 3000
+          optional: true
+      - takeScreenshot: libdiag-B1
+      - extendedWaitUntil:
+          visible: "__qa_dump_libdiag_B1__"
+          timeout: 2000
+          optional: true
+# B2
+- tapOn:
+    id: "library-tile"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 4000
+    optional: true
+- takeScreenshot: libdiag-B2
+- runFlow:
+    when:
+      visible:
+        id: "video-share"
+    commands:
+      - tapOn:
+          text: "Geri|Back"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "library-segment"
+          timeout: 10000
+          optional: true
+
+# ---- PART C: only if the welcome line is still there ----
+- runFlow:
+    when:
+      visible:
+        id: "account-welcome"
+    commands:
+      - tapOn:
+          id: "account-welcome-open"
+          retryTapIfNoChange: false
+          optional: true
+      - extendedWaitUntil:
+          visible: "__qa_fixed_wait_never_present__"
+          timeout: 4000
+          optional: true
+      - takeScreenshot: libdiag-C1
+      - tapOn:
+          id: "account-later"
+          optional: true
+
+# ---- Control: does another tab's content take taps? ----
+- tapOn:
+    id: "tab-settings"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2000
+    optional: true
+- tapOn:
+    id: "settings-language"
+    retryTapIfNoChange: false
+    optional: true
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2000
+    optional: true
+- takeScreenshot: libdiag-S1

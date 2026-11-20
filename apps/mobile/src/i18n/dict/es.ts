@@ -1,0 +1,1050 @@
+/**
+ * es translations, keyed by the Turkish source text (see src/i18n/index.ts).
+ * Generated from tools/extract-i18n.mjs; {0}, {1} are values filled in by the app.
+ */
+export const es: Readonly<Record<string, string>> = {
+  " Fotoğraflar'a kaydedildi.": " guardada en Fotos.",
+  " yazılırken videodaki metin canlı değişir.":
+    " el texto del vídeo cambia en directo.",
+  "{0}\nKlipler kitaplıkta kalır.":
+    "{0}\nSus clips se quedan en la biblioteca.",
+  "{0} {1}, otomatik yenilenir. {2}":
+    "{0} {1}, se renueva automáticamente. {2}",
+  "{0} aşağı": "{0} hacia abajo",
+  "{0} dakika": "{0} min",
+  "{0} dosya Fotoğraflar'a kaydedildi.": "{0} archivos guardados en Fotos.",
+  "{0} görsel Fotoğraflar'a kaydedildi.": "{0} imágenes guardadas en Fotos.",
+  "{0} görsel Fotoğraflar'a kaydedilemedi.":
+    "{0} imágenes no se pudieron añadir a Fotos.",
+  "{0} görsel kaydet": "Guardar {0} imágenes",
+  "{0} görseli Fotoğraflar'a kaydedildi.": "Imagen de {0} guardada en Fotos.",
+  "{0} klibi ekle": "Añadir {0} clips",
+  "{0} klip": "{0} clips",
+  "{0} klip artık kitaplıkta olmadığı için projeden çıkarıldı.":
+    "{0} clips ya no están en la biblioteca y se quitaron del proyecto.",
+  "{0} Kurgu masası projesinden de çıkar. ":
+    "También se quita de {0} proyectos de la mesa de edición. ",
+  "{0} saniye": "{0} s",
+  "{0} saniyelik video": "Vídeo de {0} segundos",
+  "{0} sn": "{0} s",
+  "{0} video eklenemedi.": "No se pudieron añadir {0} vídeos.",
+  "{0} video seçildi": "{0} vídeos seleccionados",
+  "{0} video silinsin mi?": "¿Eliminar {0} vídeos?",
+  "{0} video, {1} taslak": "{0} vídeos, {1} borradores",
+  "{0} videoyu sil": "Eliminar {0} vídeos",
+  "{0} yukarı": "{0} hacia arriba",
+  "{0} zeminde görsel hazırlanamadı.":
+    "No se pudo crear la imagen en {0} fondos.",
+  "{0}. klibin kırpma aralığı geçersiz.":
+    "El rango de recorte del clip {0} no es válido.",
+  "{0}. klibin kırpma aralığı klipten uzun.":
+    "El rango de recorte del clip {0} es más largo que el clip.",
+  "{0}. klibin seçili aralığında görüntü yok.":
+    "En el rango elegido del clip {0} no hay imagen.",
+  "{0}. klipte görüntü yok.": "El clip {0} no tiene imagen.",
+  "{0}/{1} dosya kaydedildi. Hazırlanamayan: {2}.":
+    "{0}/{1} archivos guardados. No creados: {2}.",
+  "{0}/{1} hazır{2}": "{0}/{1} listos{2}",
+  "{0}/{1} klip": "{0}/{1} clips",
+  "/ ay": "/ mes",
+  "/ hafta": "/ semana",
+  "/ yıl": "/ año",
+  "%{0} · Bitene kadar açık kalsın": "{0} % · Deja Vidora abierto",
+  "0 ile {0} sn arasında bir değer gir.": "Introduce un valor de 0 a {0} s.",
+  "1 görsel kaydet": "Guardar 1 imagen",
+  "1 ile 20 arasında klip gerekir.": "Se necesitan entre 1 y 20 clips.",
+  "10 fotoğrafa kadar": "Hasta 10 fotos",
+  "1080p video ve görseller": "Vídeos e imágenes en 1080p",
+  "1080p videolar Fotoğraflar'a kaydedilir, filigran yok":
+    "Vídeos en 1080p guardados en Fotos, sin marca de agua",
+  "9:16, 4:5 ve 1:1 video, ana görsel, gönderi ve hikâye kapağı sırayla Fotoğraflar'a kaydedilir. Vidora açık kalmalı.":
+    "Los vídeos 9:16, 4:5 y 1:1, la imagen principal y las portadas de publicación e historia se guardan una a una en Fotos. Vidora debe seguir abierta.",
+  "Abone değil": "Sin suscripción",
+  "Abone ol": "Suscribirse",
+  "Aboneliği yönet": "Gestionar suscripción",
+  "Aboneliğin doğrulanamadı. Ayarlar'dan “Satın alımları geri yükle”yi dene.":
+    "No se pudo verificar tu suscripción. Prueba «Restaurar compras» en Ajustes.",
+  "Aboneliğini istediğin zaman iptal edebilirsin. Abonelik Apple Hesabın üzerinden yönetilir; iptal edersen dönem sonuna kadar Pro açık kalır. Yenilenme tarihinden en az 24 saat önce iptal etmelisin.":
+    "Puedes cancelar tu suscripción en cualquier momento. Se gestiona desde tu cuenta de Apple; si cancelas, Pro sigue activo hasta el final del periodo. Cancela al menos 24 horas antes de la fecha de renovación.",
+  Abonelik: "Suscripción",
+  "Abonelik iptal ve iade": "Cancelación y reembolsos",
+  "Abonelik planı": "Plan de suscripción",
+  "Abonelikler'e dokun.": "Toca «Suscripciones».",
+  "Aboneliklerimi aç": "Abrir mis suscripciones",
+  Açık: "Claro",
+  "Açık meşe": "Roble claro",
+  "Açık yeşil": "Lima",
+  "Adaçayı fon": "Papel salvia",
+  "Adaçayı ışık turu": "Recorrido de luz salvia",
+  "Adaçayı kutu": "Unboxing salvia",
+  "Adaçayı sade": "Salvia sencillo",
+  "Adres https:// ile başlamalı. iOS şifrelenmemiş HTTP bağlantılarını engeller.":
+    "La dirección debe empezar por https://. iOS bloquea las conexiones HTTP sin cifrar.",
+  "Adrese kullanıcı adı veya parola ekleme; erişim anahtarını aşağıdaki alana gir.":
+    "No pongas usuario ni contraseña en la dirección; introduce la clave de acceso en el campo de abajo.",
+  Afiş: "Póster",
+  "AI Sahne bulutta çalışır": "Escena IA funciona en la nube",
+  "AI Sahne izni geri alındı": "Permiso de Escena IA retirado",
+  "AI Sahne iznini geri al": "Retirar el permiso de Escena IA",
+  "AI Sahne ürününü mermer stüdyodan sahile kadar fotoğraf gerçekliğinde sahnelere yerleştirir. Ürünün ve logon hiç değişmez; fotoğrafın telefonundan çıkmaz.":
+    "Escena IA coloca tu producto en escenas fotorrealistas, desde un estudio de mármol hasta la playa. Tu producto y tu logotipo no cambian nunca, y tu foto no sale de tu teléfono.",
+  "AI Sahne Vidora Pro ile açılır.": "Escena IA se incluye con Vidora Pro.",
+  "AI stüdyo": "Estudio IA",
+  "AI Stüdyo": "Estudio IA",
+  Akış: "Feed",
+  "Akış 4:5": "Feed 4:5",
+  Alt: "Abajo",
+  Altyazı: "Subtítulos",
+  "Altyazı konumu": "Posición de los subtítulos",
+  "Altyazı metni · ": "Texto de los subtítulos · ",
+  "Altyazı oluştur": "Crear subtítulos",
+  "Altyazı oluşturma durduruldu.": "Se detuvo la creación de subtítulos.",
+  "Altyazı oluşturmak için iOS uygulama derlemesi gerekir.":
+    "Para crear subtítulos hace falta la compilación nativa de iOS.",
+  "Altyazı oluşturmayı durdur": "Detener la creación de subtítulos",
+  "Altyazı oluşturuluyor ({0}/{1})": "Creando subtítulos ({0}/{1})",
+  "Altyazı satırını sil: ": "Eliminar línea de subtítulo: ",
+  "Altyazı stili": "Estilo de subtítulos",
+  "Altyazı stili örneği": "Ejemplo de estilo de subtítulos",
+  "Altyazılar zaten oluşturuluyor.": "Los subtítulos ya se están creando.",
+  "Altyazıları göster": "Mostrar subtítulos",
+  "Altyazıyı düzenle: ": "Editar subtítulo: ",
+  "Altyazıyı paylaş": "Compartir subtítulos",
+  "Altyazıyı yeniden oluştur: ": "Volver a crear subtítulos: ",
+  "Amazon · 2000×2000": "Amazon · 2000×2000",
+  "Ana görsel": "Imagen principal",
+  "Ana görsel · beyaz, yazısız": "Imagen principal · blanca, sin texto",
+  "Anahtar kelimeleri vurgula": "Resaltar palabras clave",
+  "API'yi özel bir ağ üzerinden HTTPS ile aç: ör. Tailscale HTTPS (`tailscale serve`) ya da geçerli sertifikalı bir ters proxy.":
+    "Expón la API por HTTPS en una red privada, por ejemplo con Tailscale HTTPS (`tailscale serve`) o un proxy inverso con certificado válido.",
+  "App Store bu işlemi doğrulayamadı.":
+    "El App Store no pudo verificar esta transacción.",
+  "App Store bu işlemi doğrulayamadı. Ücret alındıysa “Satın alımları geri yükle”ye dokun.":
+    "El App Store no pudo verificar esta transacción. Si te cobraron, toca «Restaurar compras».",
+  "App Store'a şu anda ulaşılamıyor. Bağlantını kontrol edip tekrar dene.":
+    "El App Store no está disponible ahora. Revisa tu conexión e inténtalo de nuevo.",
+  "App Store'a şu anda ulaşılamıyor. Daha sonra tekrar dene.":
+    "El App Store no está disponible ahora. Inténtalo más tarde.",
+  "App Store'a ulaşılamadı": "No se pudo conectar con el App Store",
+  "Apple Intelligence denetleniyor…": "Comprobando Apple Intelligence…",
+  "Apple Intelligence ile öner": "Sugerir con Apple Intelligence",
+  "Apple tarafından işlendi": "procesado por Apple",
+  "Arka plan": "Fondo",
+  "Arka plan Fotoğraflar'a kaydedildi.": "Fondo guardado en Fotos.",
+  "Arka plan görseli okunamadı. Başka bir zemin ya da sahne seç.":
+    "No se pudo leer la imagen de fondo. Elige otro fondo u otra escena.",
+  "Arka plan telefonunda silinir, fotoğrafın dışarı çıkmaz.":
+    "El fondo se quita en tu teléfono; la foto no sale de él.",
+  "Arka planı kaldırılmış ürün": "Producto recortado",
+  "Arka planı kaydet": "Guardar fondo",
+  "Aşağı taşı": "Mover abajo",
+  "ay başına {0}": "{0} al mes",
+  Ayarlar: "Ajustes",
+  "Ayarları aç": "Abrir Ajustes",
+  Aylık: "Mensual",
+  "aylık plana göre {0} tasarruf": "{0} menos que el plan mensual",
+  Bağlan: "Conectar",
+  "Bağlanılıyor…": "Conectando…",
+  "Bağlantı açılamadı. İnternete bağlanıp yeniden dene.":
+    "No se pudo abrir el enlace. Conéctate a internet e inténtalo de nuevo.",
+  "Bağlantı kesildi. Eşleştirme kayıtlı kaldı; uygulama yeniden açıldığında otomatik bağlanılır.":
+    "Desconectado. El emparejamiento sigue guardado y se reconecta al volver a abrir la app.",
+  "Bağlantını kontrol edip yeniden dene. Satın alımlarını geri yükleyebilirsin.":
+    "Revisa tu conexión e inténtalo de nuevo. Aún puedes restaurar compras.",
+  "Bağlantıyı kes": "Desconectar",
+  "Bağlantıyı kes ve bu iş istasyonunu unut":
+    "Desconectar y olvidar esta estación de trabajo",
+  "Bağlı iş istasyonunda video üretim modeli yapılandırılmamış, bu yüzden üretim kapalı. İş istasyonunda bir metinden/görselden videoya modeli etkinleştir ve yeniden bağlan.":
+    "La estación de trabajo conectada no tiene configurado ningún modelo de vídeo, así que la generación está desactivada. Activa en ella un modelo de texto a vídeo o de imagen a vídeo y vuelve a conectar.",
+  "Başka bir dışa aktarma sürüyor.": "Ya hay otra exportación en curso.",
+  "Başka bir ürün videosu hazırlanıyor.":
+    "Ya se está creando otro vídeo de producto.",
+  "Başka fotoğraf seç": "Elegir otra foto",
+  "Başka fotoğraf seç.": "Elige otra foto.",
+  "Başka fotoğraf seçme ya da kaldırma seçeneklerini açar":
+    "Abre opciones para cambiar o quitar la foto",
+  Başlangıç: "Inicio",
+  "Başlangıç (sn)": "Inicio (s)",
+  "Başlangıç bitişten önce olmalı ve ikisi de klibin içinde kalmalı.":
+    "El inicio debe ir antes del final, y ambos deben estar dentro del clip.",
+  "Başlangıç görseli ekle": "Añadir imagen inicial",
+  Başlık: "Titular",
+  "Başlık 100 karakterden uzun.": "El título tiene más de 100 caracteres.",
+  "Başlık konumu": "Posición del título",
+  "Başlık metni": "Texto del título",
+  "Başlık önerileri": "Ideas de titulares",
+  "Beklenenden uzun sürüyor. Bekleyebilir ya da iptal edebilirsin.":
+    "Está tardando más de lo esperado. Puedes esperar o cancelar.",
+  Beton: "Hormigón",
+  "Beton dönüş": "Giratoria hormigón",
+  "Beton kutu": "Unboxing hormigón",
+  "Beton minimal": "Hormigón minimal",
+  Beyaz: "Blanco",
+  "Beyaz mermer": "Mármol blanco",
+  "Bilgisayarında (iş istasyonu) Vidora API'yi çalıştır.":
+    "Ejecuta la API de Vidora en tu ordenador (la estación de trabajo).",
+  "BİR FOTOĞRAF.": "UNA FOTO.",
+  "Bir kaynak dosya bulunamadı. Klibi kitaplıktan kaldırıp yeniden ekle.":
+    "Falta un archivo de origen. Quita el clip de la biblioteca y vuelve a añadirlo.",
+  "Bir klipte görüntü yok.": "Un clip no tiene imagen.",
+  "BİR REKLAM.": "UN ANUNCIO.",
+  "Bir sonraki kullanımda yeniden sorulur.":
+    "Se te volverá a preguntar la próxima vez.",
+  "Bir ürün fotoğrafından reklam videosu.":
+    "Un vídeo publicitario a partir de una foto de producto.",
+  Bitiş: "Fin",
+  "Bitiş (sn)": "Fin (s)",
+  "Bitiş başlangıçtan büyük olmalı.": "El final debe ir después del inicio.",
+  Bitti: "Listo",
+  "Boş bıraktığın alan videoda görünmez.":
+    "Los campos que dejes vacíos no aparecen en el vídeo.",
+  Botanik: "Botánico",
+  Boyut: "Tamaño",
+  "Bu Apple Hesabında etkin bir Vidora Pro aboneliği bulunamadı.":
+    "No se encontró una suscripción activa a Vidora Pro en esta cuenta de Apple.",
+  "Bu Apple Hesabında etkin bir Vidora Pro aboneliği yok.":
+    "Esta cuenta de Apple no tiene una suscripción activa a Vidora Pro.",
+  "Bu ayar desteklenmiyor.": "Este ajuste no es compatible.",
+  "Bu cihaz Apple Intelligence desteklemiyor; yukarıdaki hazır öneriler kullanılabilir.":
+    "Este dispositivo no es compatible con Apple Intelligence; puedes usar las ideas listas de arriba.",
+  "Bu cihazda paylaşım kullanılamıyor.":
+    "Compartir no está disponible en este dispositivo.",
+  "Bu çalışma açılamadı; dosyaları silinmiş olabilir.":
+    "No se pudo abrir este trabajo; puede que sus archivos se hayan eliminado.",
+  "Bu çalışmanın arka plan fotoğrafı bulunamadı; onsuz açıldı.":
+    "No se encontró la foto de fondo de este trabajo; se abrió sin ella.",
+  "Bu çalışmanın müziği bulunamadı; müziksiz açıldı.":
+    "No se encontró la música de este trabajo; se abrió sin música.",
+  "Bu çalışmanın müziği ve arka plan fotoğrafı bulunamadı; onlarsız açıldı.":
+    "No se encontraron la música ni la foto de fondo de este trabajo; se abrió sin ellas.",
+  "Bu derlemede App Store satın alımları kullanılamıyor. Abonelik yalnızca App Store ya da TestFlight sürümünde açılır.":
+    "En esta compilación no están disponibles las compras del App Store. Las suscripciones solo funcionan en la versión del App Store o de TestFlight.",
+  "Bu dil için konuşma tanıma şu anda kullanılamıyor. İnternet bağlantını kontrol et ya da başka bir dil seç.":
+    "El reconocimiento de voz no está disponible ahora para este idioma. Revisa tu conexión o elige otro idioma.",
+  "Bu fotoğraf okunamadı. Başka bir fotoğraf seç.":
+    "No se pudo leer esta foto. Elige otra foto.",
+  "Bu geçerli bir adres değil. https:// ile başlayan tam adresi gir.":
+    "Esa no es una dirección válida. Introduce la dirección completa que empieza por https://.",
+  "Bu iş istasyonu görselden video üretimini desteklemiyor. Görseli kaldırarak yalnızca metinle üretebilirsin.":
+    "Esta estación de trabajo no admite imagen a vídeo. Quita la imagen para generar solo con texto.",
+  "Bu iş istasyonu unutulsun mu?": "¿Olvidar esta estación de trabajo?",
+  "Bu iş istasyonu yalnızca metinden video üretimini desteklemiyor. Başlangıç görseli ekleyerek görselden video üretebilirsin.":
+    "Esta estación de trabajo no admite generar solo con texto. Añade una imagen inicial para generar imagen a vídeo.",
+  "Bu klipte konuşma bulunamadı.": "No se encontró voz en este clip.",
+  "Bu klipteki altyazı düzeltmelerin silinecek.":
+    "Se perderán tus correcciones de subtítulos de este clip.",
+  "Bu lisans metni bulunamadı.": "No se encontró este texto de licencia.",
+  "Bu proje Kitaplık › Taslaklar'da kalır.":
+    "Este proyecto se queda en Biblioteca › Borradores.",
+  "Bu proje silinsin mi?": "¿Eliminar este proyecto?",
+  "Bu sahneyi kullan": "Usar esta escena",
+  "Bu süre kullanılamaz": "Ese tiempo no se puede usar",
+  "Bu taslak silinsin mi?": "¿Eliminar este borrador?",
+  "Bu video bulunamadı. Silinmiş ya da yenisiyle değiştirilmiş olabilir.":
+    "No se encontró este vídeo. Puede que se haya eliminado o reemplazado.",
+  "Bu video oranı desteklenmiyor.":
+    "Esta proporción de vídeo no es compatible.",
+  "Bu video silinsin mi?": "¿Eliminar este vídeo?",
+  "Bu videonun sesi okunamadı.": "No se pudo leer el audio de este vídeo.",
+  "Bugün kalan: {0} sahne": "Quedan hoy: {0} escenas",
+  "Bugünkü sahne hakkın doldu. Hakların gece yarısı (UTC) yenilenir.":
+    "Has usado las escenas de hoy. Se renuevan a medianoche (UTC).",
+  "Bugünkü yapay zekâ kotası doldu, yarın tekrar dene.":
+    "Se agotó la cuota de IA de hoy; inténtalo mañana.",
+  "Buluta yalnızca seçtiğin sahne stili ve abonelik doğrulaması gider; ürün fotoğrafın gönderilmez.":
+    "Solo el estilo de escena que elijas y una comprobación de suscripción van a la nube; tu foto de producto no se envía.",
+  "Buton yazısı": "Texto del botón",
+  "Buton yazısı önerileri": "Ideas para el texto del botón",
+  "Büyük fiyat": "Precio grande",
+  "Büyük serif başlık, yavaş kamera yaklaşması ve sade bir dergi düzeni.":
+    "Un titular grande con serifa, un acercamiento lento y una maquetación de revista serena.",
+  Büyüt: "Más grande",
+  Ceviz: "Nogal",
+  "Ceviz dönüş": "Giratoria nogal",
+  "Ceviz editoryal": "Nogal editorial",
+  "Ceviz vitrin": "Escaparate nogal",
+  "cihazda işlendi": "procesado en el dispositivo",
+  Çık: "Salir",
+  "Çıkarsan son değişikliklerin kaybolur.":
+    "Si sales, perderás tus últimos cambios.",
+  "Çıkarsan video iptal edilir. Düzenlemelerin taslak olarak kalır.":
+    "Si sales, se cancela el vídeo. Tus ediciones se guardan como borrador.",
+  Çıktı: "Exportación",
+  Çoğalt: "Duplicar",
+  "Çok hızlı istek gönderildi. Bir dakika bekleyip tekrar dene.":
+    "Demasiadas solicitudes. Espera un minuto e inténtalo de nuevo.",
+  Çözünürlük: "Resolución",
+  "Daha fazla göster ({0})": "Mostrar más ({0})",
+  Daktilo: "Máquina de escribir",
+  Dar: "Condensada",
+  DENEME: "PRUEBA",
+  "Deneme sürümü: Pro açık": "Versión de prueba: Pro desbloqueado",
+  "Denetleniyor…": "Comprobando…",
+  Destek: "Soporte",
+  Detay: "Detalle",
+  Dev: "Impact",
+  "Devam et": "Continuar",
+  "Devam etmek için AI Sahne'nin buluta istek göndermesine izin vermelisin.":
+    "Para continuar, permite que Escena IA envíe una solicitud a la nube.",
+  "Dışa aktarılıyor": "Exportando",
+  "Dışa aktarma bitene kadar Vidora'yı açık tut.":
+    "Mantén Vidora abierta hasta que termine la exportación.",
+  "Dışa aktarma için 1–20 klip gerekir.":
+    "La exportación necesita entre 1 y 20 clips.",
+  "Dışa aktarma için iOS uygulama derlemesi gerekir.":
+    "Para exportar hace falta la compilación nativa de iOS.",
+  "Dışa aktarma iptal edildi.": "Exportación cancelada.",
+  "Dışa aktarmayı iptal et": "Cancelar exportación",
+  "Diğer zeminlerde de üret": "Crear también en más fondos",
+  "Diğer zeminlerde de üret…": "Crear también en más fondos…",
+  Dikey: "Vertical",
+  "Dikey 2:3": "Vertical 2:3",
+  "Dikey videoda yazılar Reels ve TikTok düğmelerinin altında kalmaz.":
+    "En vídeo vertical, los textos quedan fuera de los botones de Reels y TikTok.",
+  Dil: "Idioma",
+  "Dokun, sonra fotoğrafı seç": "Toca uno y luego elige la foto",
+  "Doldur (kırp)": "Rellenar (recortar)",
+  "Dosya {0} MB; 2 MB sınırı olan pazaryerleri kabul etmeyebilir.":
+    "El archivo pesa {0} MB; los marketplaces con un límite de 2 MB pueden rechazarlo.",
+  "Dosya boyutu": "Tamaño de archivo",
+  "Dosya cihazda kaydedilemedi. Tekrar dene.":
+    "No se pudo guardar el archivo en el dispositivo. Inténtalo de nuevo.",
+  Dosyalar: "Archivos",
+  "Dosyalar'dan bir ses dosyası seç, en çok 50 MB. Yalnızca kullanma hakkın olan müziği ekle.":
+    "Elige un archivo de audio desde Archivos, hasta 50 MB. Añade solo música de la que tengas derechos de uso.",
+  "Dosyalardan ekle": "Añadir desde Archivos",
+  "Döner vitrin": "Giratoria",
+  Durdur: "Detener",
+  "Durduruldu. {0}/{1} dosya Fotoğraflar'a kaydedildi.":
+    "Detenido. {0}/{1} archivos guardados en Fotos.",
+  "Düz renk": "Color liso",
+  "Düz renkler": "Colores lisos",
+  Düzenle: "Editar",
+  "Düzenlediğin videolar burada kendiliğinden saklanır.":
+    "Los vídeos que edites se guardan aquí automáticamente.",
+  düzenlendi: "editado",
+  Düzenleyici: "Editor",
+  Editoryal: "Editorial",
+  "Ekle ({0})": "Añadir ({0})",
+  Elektronik: "Electrónica",
+  "EN AVANTAJLI": "MEJOR PRECIO",
+  "En fazla {0} fotoğraf seç. Her biri sırayla arka plandan ayrılır ve kendi videosu olarak Kitaplık'a kaydedilir. İşlem bitene kadar Vidora'yı açık tut.":
+    "Elige hasta {0} fotos. Cada una se recorta por turnos y se guarda en tu biblioteca como su propio vídeo. Mantén Vidora abierta hasta que termine.",
+  "En fazla {0} zemin seç. Videonun son karesi her zeminde seçtiğin oranda 1080p görsel olarak Fotoğraflar'a kaydedilir.":
+    "Elige hasta {0} fondos. El último fotograma del vídeo se guarda en Fotos sobre cada uno, como imagen de 1080p con la forma que elegiste.",
+  "En üstteki adına (Apple Hesabın) dokun.":
+    "Toca tu nombre (cuenta de Apple) en la parte superior.",
+  "Erişim anahtarı": "Clave de acceso",
+  "Erişim anahtarını gir.": "Introduce la clave de acceso.",
+  "Eski fiyat": "Precio anterior",
+  "Eski fiyat, fiyat da yazılınca görünür.":
+    "El precio anterior aparece cuando también se escribe un precio.",
+  "Eski fiyatın üstü çizilir, yeni fiyat büyüyerek gelir; iri indirim etiketiyle.":
+    "El precio anterior se tacha y el nuevo aparece en grande, con una insignia de descuento destacada.",
+  "Eşleştirme yardımını gizle": "Ocultar ayuda de emparejamiento",
+  Etiket: "Etiqueta",
+  "Etiket önerileri": "Ideas de etiquetas",
+  Etkin: "Activa",
+  "Etkin abonelik bulunamadı": "No se encontró una suscripción activa",
+  "Ev ve dekorasyon": "Hogar y decoración",
+  Fildişi: "Marfil",
+  "Fildişi sade": "Marfil sencillo",
+  Fiyat: "Precio",
+  Format: "Formato",
+  "Fotoğraf {0}": "Foto {0}",
+  "Fotoğraf açılamadı.": "No se pudo abrir la foto.",
+  "Fotoğraf çek": "Hacer foto",
+  "Fotoğraf hazırlanıyor…": "Preparando la foto…",
+  "Fotoğraf karanlık: daha aydınlık bir yerde çek.":
+    "La foto está oscura: hazla con más luz.",
+  "Fotoğraf okunamadı. Başka bir fotoğraf seç.":
+    "No se pudo leer la foto. Elige otra foto.",
+  "Fotoğraf seç": "Elegir una foto",
+  "Fotoğrafı değiştir": "Cambiar foto",
+  "Fotoğrafı kaldır": "Quitar la foto",
+  "Fotoğrafını zemin yapar": "Vuelve a usar tu foto",
+  Fotoğraflar: "Fotos",
+  "Fotoğraflar'a ekleme izni verilmedi. Ayarlar > Vidora > Fotoğraflar bölümünden izin verebilirsin.":
+    "Se denegó el permiso para añadir a Fotos. Puedes permitirlo en Ajustes > Vidora > Fotos.",
+  "Fotoğraflar'a kaydedildi": "Guardado en Fotos",
+  "Fotoğraflar'a kaydedildi.": "Guardado en Fotos.",
+  "Fotoğraflar'a kaydedildi. Paylaşabilirsin.":
+    "Guardado en Fotos. Listo para compartir.",
+  "Fotoğraflar'a kaydedilemedi. Fotoğraflar izninin açık olduğunu ve telefonda yer olduğunu kontrol edip tekrar dene.":
+    "No se pudo guardar en Fotos. Comprueba que el permiso de Fotos esté activado y que haya espacio en el teléfono, y vuelve a intentarlo.",
+  "Fotoğraflar'a kaydet": "Guardar en Fotos",
+  "Fotoğraflar'a kaydettiklerin kalır. Bu işlem geri alınamaz.":
+    "Lo que guardaste en Fotos se mantiene. Esto no se puede deshacer.",
+  "Fotoğraflardan ekle": "Añadir desde Fotos",
+  "Fotoğraflarından bir zemin seçer": "Elige un fondo de tus fotos",
+  "Fotoğrafta ürün bulunamadı. Ürünü sade bir zeminde, kadrajı dolduracak şekilde çek.":
+    "No se encontró ningún producto en la foto. Fotografíalo sobre un fondo liso y que llene el encuadre.",
+  "Galeriden seç": "Elegir de la biblioteca",
+  Gece: "Noir",
+  "Gece fon": "Papel nocturno",
+  "Gece ışık turu": "Recorrido de luz nocturno",
+  "Gece kampanya": "Campaña nocturna",
+  "Gece mağaza": "Tienda nocturna",
+  "Gece mücevher": "Joya nocturna",
+  "Gece vitrini": "Escaparate nocturno",
+  "Geçerli aralık: 0 – {0} sn, bitiş başlangıçtan büyük olmalı.":
+    "Rango válido: 0 – {0} s, y el final debe ir después del inicio.",
+  Geri: "Atrás",
+  "Geri al": "Deshacer",
+  "Geri yükleniyor…": "Restaurando…",
+  "Gıda ve içecek": "Alimentos y bebidas",
+  "Giyim ve ayakkabı": "Ropa y calzado",
+  Gizlilik: "Privacidad",
+  "Gizlilik politikası": "Política de privacidad",
+  "Gizlilik Politikası": "Política de privacidad",
+  "Gönderilen: seçtiğin sahne stili ve aboneliğini doğrulamak için App Store'un imzaladığı abonelik bilgisi (ürün, işlem numarası, bitiş tarihi). Adın, e-postan veya ödeme bilgin gönderilmez.":
+    "Se envía: el estilo de escena que elijas y el registro de suscripción firmado por el App Store para verificar tu suscripción (producto, número de transacción, vencimiento). Ni nombre, ni correo, ni datos de pago.",
+  görsel: "imagen",
+  Görsel: "Imagen",
+  "Görsel boyutu desteklenmiyor (kenarlar 500–4096 piksel olmalı).":
+    "Ese tamaño de imagen no es compatible (los lados deben medir 500–4096 píxeles).",
+  "Görsel Fotoğraflar'a kaydedildi.": "Imagen guardada en Fotos.",
+  "Görsel hazırlanamadı. Tekrar dene.":
+    "No se pudo crear la imagen. Inténtalo de nuevo.",
+  "Görsel hazırlanırken uygulama arka plana geçti. Tekrar dene.":
+    "La app pasó a segundo plano mientras se creaba la imagen. Inténtalo de nuevo.",
+  "Görsel hazırlanıyor…": "Preparando la imagen…",
+  "Görsel kaydetmek için uygulamanın yeni iOS derlemesi gerekir.":
+    "Para guardar una imagen hace falta la compilación más reciente de la app para iOS.",
+  "Görsel olarak kaydet": "Guardar como imagen",
+  "Görsel olarak kaydet…": "Guardar como imagen…",
+  "Görseli kaldır": "Quitar imagen",
+  "Görselini kaydet": "Guarda tu imagen",
+  "Görseller hazırlanıyor ({0}/{1})": "Preparando imágenes ({0}/{1})",
+  Görünümler: "Estilos",
+  "Görünümler ve metin önerileri buna göre değişir.":
+    "Los estilos y las ideas de texto se adaptan a esto.",
+  Güçlü: "Intenso",
+  Haftalık: "Semanal",
+  "Hakkında ve destek": "Acerca de y soporte",
+  "Hareket, videoyu oluştururken telefondaki şablonlarla eklenir.":
+    "El movimiento lo añaden las plantillas en tu teléfono al crear el vídeo.",
+  "Hareketsiz ürün, bol boşluk ve küçük, aralıklı büyük harflerle yazılar.":
+    "Un producto quieto, mucho espacio y pequeñas mayúsculas muy espaciadas.",
+  Hazır: "Listo",
+  "Hazır · {0} kelime": "Listo · {0} palabras",
+  "Hazır, Kitaplık'ta": "Listo, en tu biblioteca",
+  "Hazırlanıyor {0}/{1}: {2}": "Preparando {0}/{1}: {2}",
+  "Hazırlanıyor…": "Preparando…",
+  "Hazırlanıyor… · Bitene kadar açık kalsın":
+    "Preparando… · Deja Vidora abierto",
+  "Hedef dosya zaten var. Tekrar dene.":
+    "El archivo de destino ya existe. Inténtalo de nuevo.",
+  "Hemen sipariş ver": "Pídelo ya",
+  "Henüz altyazı yok": "Aún no hay subtítulos",
+  "Henüz klip yok": "Aún no hay clips",
+  "Henüz video yok": "Aún no hay vídeos",
+  "Hepsi bir arada": "Todo de una vez",
+  "Hepsi hazırlanıyor…": "Preparando todo…",
+  "Hepsini çıkar": "Exportar todo",
+  "Hesabı sil": "Eliminar cuenta",
+  "Hesap isteğe bağlıdır; açarsan e-posta adresin ve şifren Google Firebase Authentication'a gönderilir ve e-posta adresin orada saklanır. Vidora seni takip etmez.":
+    "Una cuenta es opcional; si creas una, tu correo y tu contraseña se envían a Google Firebase Authentication, que guarda tu correo. Vidora no te rastrea.",
+  "Hesap silindi.": "Cuenta eliminada.",
+  "Hiç görsel kaydedilmedi.": "No se guardó ninguna imagen.",
+  "Hikâye kapağı": "Portada de historia",
+  "Hikâye kapağı · 1080×1920": "Portada de historia · 1080×1920",
+  "Instagram gönderi": "Publicación de Instagram",
+  "Instagram gönderi · 1080×1350": "Publicación de Instagram · 1080×1350",
+  "Işık patlamasıyla ürün kutudan çıkar gibi belirir; paket ve hediye vurgusu.":
+    "El producto aparece de golpe, como saliendo de su caja, con aire de regalo.",
+  "Işık turu": "Recorrido de luz",
+  "İade için Apple'a başvur": "Solicitar un reembolso a Apple",
+  "İade istekleri Apple tarafından değerlendirilir; sonucu Apple belirler. Başvuru için Apple'ın sayfasını kullanabilirsin.":
+    "Apple gestiona las solicitudes de reembolso y es quien decide. Puedes usar la página de Apple para enviar una.",
+  "İçe aktarılan klipler": "Clips importados",
+  "İçeriğin ve yüz/ses kullanımının izinleri bende.":
+    "Tengo los derechos del contenido y los permisos de rostro/voz.",
+  İndirim: "Descuento",
+  "İndirim duyurusu": "Anuncio de rebajas",
+  "İndirim etiketi, zıplayan ürün, büyük fiyat ve buton yazısı.":
+    "Insignia de descuento, producto que rebota, precio grande y texto del botón.",
+  "İnternet bağlantını kontrol edip tekrar dene.":
+    "Revisa tu conexión a internet e inténtalo de nuevo.",
+  "İnternete bağlanılamadı. Bağlantını kontrol edip tekrar dene.":
+    "No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.",
+  "İpek kumaş": "Tela de seda",
+  "iPhone'da Ayarlar'ı aç.": "Abre Ajustes en tu iPhone.",
+  "iPhone'da yer kalmadı. Biraz yer açıp tekrar dene.":
+    "Tu iPhone se ha quedado sin espacio. Libera algo de espacio e inténtalo de nuevo.",
+  İptal: "Cancelar",
+  "İptal edildi.": "Cancelado.",
+  "İptal ediliyor…": "Cancelando…",
+  "İptal uzun sürüyor. Ekrandan çıkıp tekrar açabilirsin.":
+    "La cancelación está tardando. Puedes salir de esta pantalla y volver a abrirla.",
+  "İptal ve iade": "Cancelación y reembolsos",
+  "İstediğin zaman iptal: Ayarlar › Apple Hesabın › Abonelikler.":
+    "Cancela cuando quieras: Ajustes › Cuenta de Apple › Suscripciones.",
+  "İş istasyonu adresi (HTTPS)": "Dirección de la estación de trabajo (HTTPS)",
+  "İş istasyonu adresini gir (ör. {0}).":
+    "Introduce la dirección de la estación de trabajo (p. ej. {0}).",
+  "İş istasyonu erişim anahtarını reddetti. Anahtarı kontrol edip yeniden gir.":
+    "La estación de trabajo rechazó la clave de acceso. Compruébala y vuelve a introducirla.",
+  "İş istasyonu unutuldu.": "Estación de trabajo olvidada.",
+  "İş istasyonu verileri silinsin mi?":
+    "¿Eliminar los datos de la estación de trabajo?",
+  "İş istasyonu verilerini sil": "Eliminar datos de la estación de trabajo",
+  "İş istasyonuna ulaşılamadı. Bilgisayarın açık, Vidora API çalışıyor ve iPhone aynı özel ağda (ör. Tailscale) olmalı.":
+    "No se pudo acceder a la estación de trabajo. Asegúrate de que el ordenador esté encendido, la API de Vidora en marcha y el iPhone en la misma red privada (p. ej. Tailscale).",
+  "İş istasyonunda altyazı (konuşmayı yazıya çevirme) modeli yapılandırılmamış, bu yüzden altyazı oluşturma kapalı. Modeli iş istasyonunda etkinleştirip yeniden bağlan.":
+    "La estación de trabajo no tiene configurado un modelo de subtítulos (voz a texto), así que la creación de subtítulos está desactivada. Actívalo en ella y vuelve a conectar.",
+  "İşlem tamamlanamadı. Lütfen tekrar dene.":
+    "No se pudo completar la solicitud. Inténtalo de nuevo.",
+  "İşlem tamamlanamadı. Tekrar dene; sorun sürerse uygulamayı kapatıp aç.":
+    "No funcionó. Inténtalo de nuevo; si sigue pasando, cierra y vuelve a abrir la app.",
+  "İşlem tamamlanamadı. Tekrar dene.": "No funcionó. Inténtalo de nuevo.",
+  "İşleniyor…": "Procesando…",
+  "İşleyen: {0}, FLUX.1 [schnell] modeliyle. Vidora'nın sunucusu yalnızca günlük kullanım sayacını tutar (2 gün).":
+    "Procesado por: {0}, con el modelo FLUX.1 [schnell]. El servidor de Vidora solo guarda un contador de uso diario (2 días).",
+  "İzin ver ve devam et": "Permitir y continuar",
+  Kal: "Quedarme",
+  Kaldır: "Quitar",
+  Kalite: "Calidad",
+  "Kamera izni verilmedi. Ayarlar > Vidora > Kamera bölümünden izin verebilirsin.":
+    "Se denegó el acceso a la cámara. Puedes permitirlo en Ajustes > Vidora > Cámara.",
+  Kampanya: "Campaña",
+  "Kampanya görseli": "Imagen de campaña",
+  Kapat: "Cerrar",
+  Kare: "Cuadrado",
+  "Kare · 1500×1500": "Cuadrado · 1500×1500",
+  "Kare hızı": "Velocidad de fotogramas",
+  "Kare oranı": "Relación de aspecto",
+  Kaydedildi: "Guardado",
+  "Kaydedilemedi, tekrar dene.": "No se pudo guardar, inténtalo de nuevo.",
+  "Kaydediliyor…": "Guardando…",
+  Kaydet: "Guardar",
+  "Kaydet ve paylaş": "Guardar y compartir",
+  "Kaydetmek için Vidora Pro gerekir.": "Guardar requiere Vidora Pro.",
+  "Kayıtlı adres ve erişim anahtarı bu iPhone'dan silinir. İş istasyonundaki projeler silinmez.":
+    "La dirección y la clave de acceso guardadas se eliminan de este iPhone. Los proyectos de la estación de trabajo no se borran.",
+  "Kayıtlı erişim anahtarı artık geçerli değil (iş istasyonunda değişmiş veya iptal edilmiş olabilir). Güvenlik için silindi; yeni anahtarı gir.":
+    "La clave de acceso guardada ya no es válida (puede haberse cambiado o revocado en la estación de trabajo). Se eliminó por seguridad; introduce la nueva clave.",
+  "Kayıtlı iş istasyonuna bağlanılıyor":
+    "Conectando con la estación de trabajo guardada",
+  "Kayıtlı iş istasyonuna bağlanılıyor…":
+    "Conectando con la estación de trabajo guardada…",
+  "Kayıtlı iş istasyonunu unut": "Olvidar la estación de trabajo guardada",
+  Kaynak: "Origen",
+  "Kendi bilgisayarındaki Vidora iş istasyonuyla eşleştir. Adres ve erişim anahtarı bu cihazın iOS Anahtar Zinciri'nde saklanır ve uygulama açıldığında otomatik bağlanılır.":
+    "Empareja con la estación de trabajo de Vidora de tu propio ordenador. La dirección y la clave de acceso se guardan en el llavero de iOS de este dispositivo y la app se reconecta sola al abrirse.",
+  "Kendi fotoğrafın": "Tu foto",
+  "Kendi videolarını kırp, birleştir, altyazı ekle.":
+    "Recorta y une tus propios clips, añade subtítulos.",
+  Keten: "Lino",
+  "Keten editoryal": "Lino editorial",
+  "Keten kutu": "Unboxing lino",
+  Kırmızı: "Rojo",
+  Kırp: "Recortar",
+  "Kırpma · ": "Recorte · ",
+  "Kırpma başlangıcı": "Inicio del recorte",
+  "Kırpma bitişi": "Fin del recorte",
+  "Kitaplığa dön": "Volver a la biblioteca",
+  "Kitaplığa kaydedildi.": "Guardado en la biblioteca.",
+  "Kitaplığı temizle": "Vaciar la biblioteca",
+  Kitaplık: "Biblioteca",
+  "Kitaplık bölümü": "Sección de la biblioteca",
+  "Kitaplık temizlendi": "Biblioteca vaciada",
+  "Kitaplık temizlenemedi": "No se pudo vaciar la biblioteca",
+  "Kitaplık'a ayrı bir video olarak eklendi.":
+    "Añadido a tu biblioteca como un vídeo aparte.",
+  "Kitaplık'a ayrı bir video olarak eklendi. Düzenleme bilgisi kaydedilemedi; taslağın ve önceki videolar duruyor.":
+    "Añadido a tu biblioteca como un vídeo aparte. No se pudieron guardar sus detalles de edición; tu borrador y los vídeos anteriores se conservan.",
+  "Kitaplık'a eklendi.": "Añadido a tu biblioteca.",
+  "Kitaplık'ta duruyor. Paylaşmak için Fotoğraflar'a kaydet.":
+    "Está en tu biblioteca. Guárdalo en Fotos para compartirlo.",
+  "Kitaplık'taki önceki sürümün yerini aldı. Fotoğraflar'a kaydettiğin kopyalar değişmez.":
+    "Ha reemplazado la versión anterior en tu biblioteca. Las copias guardadas en Fotos no cambian.",
+  "Kitaplıktan ekle": "Añadir desde la biblioteca",
+  Klasik: "Clásico",
+  "Klip ": "Clip ",
+  "Klip ekle": "Añadir clips",
+  "Klip önizlemesi": "Vista previa del clip",
+  "Klip süresi bilinmiyor; kırpma için iOS uygulama derlemesi gerekir.":
+    "Se desconoce la duración del clip; para recortar hace falta la compilación nativa de iOS.",
+  "Klipler kitaplıkta kalır.": "Los clips se quedan en la biblioteca.",
+  Kontur: "Contorno",
+  Konum: "Posición",
+  "Konuşma bulunamadı": "No se encontró voz",
+  "Konuşma dili": "Idioma hablado",
+  "Konuşma tanıma çok uzun sürdü. Tekrar dene ya da klibi kısalt.":
+    "El reconocimiento de voz tardó demasiado. Inténtalo de nuevo o acorta el clip.",
+  "Konuşma tanıma izni verilmedi. Ayarlar > Vidora > Konuşma Tanıma bölümünden izin verebilirsin.":
+    "Se denegó el permiso de reconocimiento de voz. Puedes permitirlo en Ajustes > Vidora > Reconocimiento de voz.",
+  "Konuşma tanıma iznini Ayarlar'da aç":
+    "Permitir el reconocimiento de voz en Ajustes",
+  "Konuşma, iOS konuşma tanıma ile yazıya dökülür; cihazına ve dile göre ses telefonunda ya da Apple'da işlenebilir.":
+    "El habla se transcribe con el reconocimiento de voz de iOS; según tu dispositivo e idioma, el audio puede procesarse en tu teléfono o en Apple.",
+  "Konuya uygun emoji ekle": "Añadir emojis relacionados",
+  "Kopyasından yeni bir video yapar":
+    "Crea un vídeo nuevo a partir de una copia",
+  Koşullar: "Condiciones",
+  Koyu: "Oscuro",
+  "Koyu premium": "Premium oscuro",
+  "Kozmetik ve parfüm": "Belleza y fragancias",
+  Kullanım: "Uso",
+  "Kullanım izinleri": "Consentimiento de uso",
+  "Kullanım Koşulları": "Términos de uso",
+  "Kum fon": "Papel arena",
+  "Kum indirim": "Rebajas arena",
+  "Kum kampanya": "Campaña arena",
+  "Kurgu masası": "Mesa de edición",
+  "Kurgu masası projeleri": "Proyectos de la mesa de edición",
+  "Kurguda aç": "Abrir en el editor",
+  "Kurgunu video olarak kaydet": "Guarda tu edición como vídeo",
+  Kurulum: "Montaje",
+  Kutu: "Caja",
+  "Kutu açılışı": "Unboxing",
+  "Küçük resim oluşturulamadı.": "No se pudo crear la miniatura.",
+  Küçült: "Más pequeño",
+  Lacivert: "Azul marino",
+  Lisans: "Licencia",
+  "Lisansın tam metni": "Texto completo de la licencia",
+  Lisanslar: "Licencias",
+  "Listeyi temizle": "Vaciar la lista",
+  "localhost / 127.0.0.1 iPhone'un kendisini gösterir, bilgisayarını değil. İş istasyonunun özel ağ (ör. Tailscale) HTTPS adresini kullan.":
+    "localhost / 127.0.0.1 apunta al propio iPhone, no a tu ordenador. Usa la dirección HTTPS de la estación de trabajo en la red privada (p. ej. Tailscale).",
+  Logo: "Logotipo",
+  "Logo cihazında saklanır. Videoda görünmesi sonraki güncellemede gelecek.":
+    "El logotipo se guarda en tu dispositivo. Mostrarlo en el vídeo llegará en una actualización posterior.",
+  "Logo seç": "Elegir logotipo",
+  "Logo yok": "Sin logotipo",
+  "Logoyu değiştir": "Cambiar logotipo",
+  "Logoyu kaldır": "Quitar logotipo",
+  "Lüks vitrin": "Escaparate de lujo",
+  Mağaza: "Tienda",
+  "Mağaza adın büyük yazılır, ürün ortada süzülür; takip çağrısıyla biter.":
+    "El nombre de tu tienda en letras grandes, el producto flotando y un llamado a seguirte al final.",
+  "Mağaza tanıtımı": "Presentación de la tienda",
+  "Marka kiti": "Kit de marca",
+  "Mavi detay": "Detalle azul",
+  "Mavi indirim": "Rebajas azul",
+  "Mermer sade": "Mármol sencillo",
+  "Mermer vitrin": "Escaparate mármol",
+  "Meşe mağaza": "Tienda roble",
+  "Meşe vitrin": "Escaparate roble",
+  Metin: "Texto",
+  "Metni düzenle ({0} satır)": "Editar texto ({0} líneas)",
+  Minimal: "Minimal",
+  "Minimal beton": "Hormigón minimal",
+  Modern: "Moderno",
+  Mor: "Morado",
+  "MP4 seç": "Elegir MP4",
+  "MP4, 8 saniyeden uzun, küçük dosya: ürün sayfasına yüklemeye hazır.":
+    "MP4, de más de 8 segundos, archivo pequeño: listo para una página de producto.",
+  "MP4, en yüksek görüntü kalitesi.": "MP4 con la máxima calidad.",
+  "Mutfak tezgâhı": "Encimera de cocina",
+  "Müziği aç": "Activar la música",
+  "Müziği değiştir": "Cambiar música",
+  "Müziği kaldır": "Quitar la música",
+  "Müziği kapat": "Silenciar la música",
+  Müzik: "Música",
+  "Müzik dosyası 50 MB sınırını aşıyor.":
+    "El archivo de música supera el límite de 50 MB.",
+  "Müzik dosyası bulunamadı ve kaldırıldı.":
+    "Faltaba el archivo de música y se quitó.",
+  "Müzik dosyası çok kısa.": "El archivo de música es demasiado corto.",
+  "Müzik dosyası seç": "Elegir un archivo de música",
+  "Müzik dosyasında ses yok.": "El archivo de música no tiene audio.",
+  "Müzik düzeyi": "Volumen de la música",
+  "Müzik seçiliyor…": "Eligiendo música…",
+  "Müzik yok": "Sin música",
+  "Nasıl eşleştirilir?": "Cómo emparejar",
+  "Ne yapmak istiyorsun?": "¿Qué quieres crear?",
+  "Nerede paylaşacaksın?": "¿Dónde lo vas a publicar?",
+  "O HTTPS adresini ve çalışma alanı erişim anahtarını aşağıya gir.":
+    "Introduce abajo esa dirección HTTPS y la clave de acceso del espacio de trabajo.",
+  Okyanus: "Océano",
+  Olmadı: "Fallido",
+  "Olmayanları tekrar dene": "Reintentar los fallidos",
+  "Onay bekleniyor": "Esperando aprobación",
+  Oran: "Forma",
+  Orta: "Centro",
+  Otomatik: "Automático",
+  "Otomatik altyazı": "Subtítulos automáticos",
+  "Oturma odası": "Salón",
+  Oynat: "Reproducir",
+  "Oynatmak veya durdurmak için dokun": "Toca para reproducir o pausar",
+  "Ödeme, satın alma onayında Apple Hesabından alınır. Abonelik, geçerli dönemin bitiminden en az 24 saat önce iptal edilmezse otomatik olarak yenilenir. App Store hesap ayarlarından dilediğin zaman yönetebilir veya iptal edebilirsin.":
+    "El pago se carga a tu cuenta de Apple al confirmar la compra. La suscripción se renueva automáticamente salvo que se cancele al menos 24 horas antes del final del periodo actual. Puedes gestionarla o cancelarla en cualquier momento en los ajustes de tu cuenta del App Store.",
+  "Önce bir ürün fotoğrafı seçip arka planını kaldır.":
+    "Primero elige una foto del producto y quita su fondo.",
+  "Önce ürünün tamamı, sonra iki yakın plan, en sonda fiyat kartı.":
+    "Primero el producto entero, luego dos primeros planos de sus detalles y, al final, una tarjeta de precio.",
+  "Önceki proje Taslaklar'a kaydedildi.":
+    "El proyecto anterior se guardó en Borradores.",
+  "Öneri yazılamadı; hazır öneriler gösteriliyor. Tekrar deneyebilirsin.":
+    "No se pudieron escribir las sugerencias; se muestran ideas ya hechas. Puedes intentarlo de nuevo.",
+  "Öneriler telefonunda Apple Intelligence ile yazıldı. Paylaşmadan önce kontrol et.":
+    "Escrito en tu teléfono con Apple Intelligence. Revísalo antes de publicar.",
+  "Öneriler yazılıyor…": "Escribiendo sugerencias…",
+  "Önizleme hazırlanamadı.": "No se pudo crear la vista previa.",
+  "Önizleme hazırlanamadı. Tekrar dene.":
+    "No se pudo preparar la vista previa. Inténtalo de nuevo.",
+  "Önizleme hazırlanıyor": "Preparando la vista previa",
+  "Önizleme konumu": "Posición de la vista previa",
+  "Önizleme ücretsiz; her değişiklikte yeniden oynar.":
+    "La vista previa es gratuita y se reproduce de nuevo tras cada cambio.",
+  "Önizleme ücretsiz. Dışa aktarmak için Vidora Pro gerekir.":
+    "La vista previa es gratuita. Exportar requiere Vidora Pro.",
+  "Önizleme ücretsiz. Video için Vidora Pro gerekir.":
+    "La vista previa es gratuita. Los vídeos requieren Vidora Pro.",
+  "Önizleme ücretsiz. Videoyu oluşturup kaydetmek için Vidora Pro gerekir.":
+    "La vista previa es gratuita. Crear y guardar un vídeo requiere Vidora Pro.",
+  "Önizleme ücretsiz. Videoyu oluşturup kaydetmek için Vidora Pro gerekir.{0}":
+    "La vista previa es gratuita. Crear y guardar un vídeo requiere Vidora Pro.{0}",
+  "Önizleme ücretsiz. Videoyu ya da görseli oluşturup kaydetmek için Vidora Pro gerekir.":
+    "La vista previa es gratuita. Crear y guardar un vídeo o una imagen requiere Vidora Pro.",
+  "Örn. Atölye Nur": "P. ej. Taller Nur",
+  "Örn. Gül & Amber Parfüm": "P. ej. Perfume Rosa y Ámbar",
+  "Örn. Hemen incele": "P. ej. Descúbrelo ya",
+  "Örn. Sınırlı stok": "P. ej. Existencias limitadas",
+  "Örnek çıktı": "Resultado de ejemplo",
+  "Örnek fotoğraf": "Foto de ejemplo",
+  "ÖRNEK ÜRÜN": "PRODUCTO DE EJEMPLO",
+  "Örnek ürün fotoğrafı": "Foto de producto de ejemplo",
+  "Örnek ürünle dene": "Prueba con un producto de ejemplo",
+  "Örnekle dene": "Prueba con un ejemplo",
+  "Özgün ses": "Sonido original",
+  Paketleme: "Packaging",
+  "Paneli kapat": "Cerrar el panel",
+  "Para kazanmanın en hızlı yolu": "La forma más rápida de ganar dinero",
+  "Pastel podyum": "Podio pastel",
+  Paylaş: "Compartir",
+  "Paylaşım açılıyor…": "Abriendo compartir…",
+  Pazaryeri: "Marketplace",
+  "Pazaryeri görselini kaydet": "Guarda tu imagen de marketplace",
+  "Pazaryeri görselleri": "Imágenes de marketplace",
+  "Pazaryeri videosu": "Vídeo de marketplace",
+  Pembe: "Rosa",
+  "Pembe afiş indirim": "Rebajas rosa",
+  "Planlar şu an alınamadı.": "No se pudieron cargar los planes.",
+  "Planlar yükleniyor": "Cargando planes",
+  "Pro ekranını kapat": "Cerrar la pantalla Pro",
+  Proje: "Proyecto",
+  "Proje açılamadı; yeni bir projeyle devam ediliyor.":
+    "No se pudo abrir el proyecto; se continúa con uno nuevo.",
+  "Proje oluştur": "Crear proyecto",
+  "Proje ve dosyaları silinsin mi?": "¿Eliminar el proyecto y sus archivos?",
+  "Projeyi aç: ": "Abrir proyecto: ",
+  "Projeyi sil": "Eliminar proyecto",
+  "Projeyi yeniden adlandır": "Renombrar proyecto",
+  Pudra: "Rubor",
+  "Pudra detay": "Detalle rubor",
+  "Pudra dönüş": "Giratoria rubor",
+  "Pudra fon": "Papel rubor",
+  "Pudra kampanya": "Campaña rubor",
+  Reklam: "Anuncio",
+  Renk: "Color",
+  "Renkli etiket": "Etiqueta de color",
+  Sade: "Sencillo",
+  "Sade bir zeminde çek, ürün kadrajı doldursun.":
+    "Fotografía sobre una superficie lisa y llena el encuadre.",
+  "Sade zeminde çek, ürün kadrajı doldursun.":
+    "Fotografía sobre una superficie lisa y llena el encuadre.",
+  "Sağa taşı": "Mover a la derecha",
+  "Sağdaki kare bu fotoğraftan telefonda hazırlandı.":
+    "El fotograma de la derecha se creó en el teléfono a partir de esta foto.",
+  "Sahil gün batımı": "Atardecer en la playa",
+  Sahne: "Escena",
+  "Sahne {0}": "Escena {0}",
+  "Sahne oluştur ({0})": "Crear escenas ({0})",
+  "Sahne tarifi": "Descripción de la escena",
+  "Sahneler hazırlanıyor (5–20 sn)…": "Creando escenas (5–20 s)…",
+  "Sahneyi değiştir": "Cambiar escena",
+  "Sahneyi kaldır": "Quitar escena",
+  "Sahneyi telefon değil, üçüncü taraf bir yapay zekâ servisi çizer. Devam etmeden önce neyin paylaşıldığını bil:":
+    "La escena la dibuja un servicio de IA de terceros, no tu teléfono. Antes de continuar, esto es lo que se comparte:",
+  Sarı: "Amarillo",
+  "Satın alımları geri yükle": "Restaurar compras",
+  "Satın alma onay bekliyor (ör. Satın Alma İzni). Onaylandığında Pro kendiliğinden açılır. Onaylanınca Videoyu oluştur düğmesine tekrar dokun.":
+    "La compra está pendiente de aprobación (p. ej., Solicitar compra). Pro se desbloquea solo cuando se apruebe. Cuando ocurra, vuelve a tocar el botón de crear.",
+  "Satır başına kelime": "Palabras por línea",
+  "Satır silindi": "Línea eliminada",
+  "Satırı sil": "Eliminar línea",
+  "Sayfa açılamadı": "No se pudo abrir la página",
+  "Sayfa açılamadı. İnternet bağlantını kontrol edip tekrar dene.":
+    "No se pudo abrir la página. Revisa tu conexión e inténtalo de nuevo.",
+  Seç: "Seleccionar",
+  "Seçilenleri sil": "Eliminar seleccionados",
+  "Seçili ": "Seleccionado ",
+  "Seçili kırpma aralığında altyazı yok.":
+    "No hay subtítulos dentro del recorte actual.",
+  "Seçili logo": "Logotipo elegido",
+  "Seçili projeyi sil": "Eliminar el proyecto seleccionado",
+  "Senin videondan bir kare, Vidora filigranlı":
+    "Un fotograma de tu vídeo, con marca de agua de Vidora",
+  "Senin videondan bir kare. Filigran yalnızca burada görünür; Pro ile kaydettiğin videoda yok.":
+    "Un fotograma de tu propio vídeo. La marca de agua solo aparece aquí; los vídeos que guardes con Pro no la llevan.",
+  "Ses düzeyi geçersiz.": "El volumen no es válido.",
+  Sığdır: "Ajustar",
+  Sırada: "En espera",
+  Sil: "Eliminar",
+  Sistem: "Sistema",
+  "Sistem bu videoyu kodlayamadı.": "El sistema no pudo codificar este vídeo.",
+  "Sistem dili": "Idioma del sistema",
+  Siyah: "Negro",
+  "Siyah detay": "Detalle negro",
+  "Siyah mermer": "Mármol negro",
+  "Sola taşı": "Mover a la izquierda",
+  "Solda örnek ürün fotoğrafı, sağda bu fotoğraftan telefonda hazırlanan video karesi. Ürün yeniden çizilmedi.":
+    "A la izquierda, una foto de producto de ejemplo; a la derecha, un fotograma de vídeo creado a partir de ella en el teléfono. El producto no se redibujó.",
+  "Son kare · 1080p": "Último fotograma · 1080p",
+  "Son kare seçtiğin oranda 1080p kaydedilir. Pazaryeri görselleri beyaz fonlu ve yazısızdır.":
+    "El último fotograma se guarda en 1080p con la forma que elijas. Las imágenes de marketplace son blancas y sin texto.",
+  "Son video: {0}, {1}. Aç": "Último vídeo: {0}, {1}. Abrir",
+  "Son videolar": "Vídeos recientes",
+  "Son videon": "Tu último vídeo",
+  "SON VİDEON": "ÚLTIMO",
+  "Son videoyu aç": "Abrir el último vídeo",
+  "Sosyal medya": "Redes sociales",
+  Standart: "Estándar",
+  Stüdyo: "Estudio",
+  "Stüdyo mermer": "Mármol de estudio",
+  "Stüdyo zeminleri": "Fondos de estudio",
+  "Süre (1–10 sn)": "Duración (1–10 s)",
+  "Süre 1 ile 10 arasında tam sayı olmalı.":
+    "La duración debe ser un número entero de 1 a 10.",
+  Şablon: "Plantilla",
+  "Şablon ayarları geçersiz: {0}":
+    "Los ajustes de la plantilla no son válidos: {0}",
+  "Şablon ayarları geçersiz.": "Los ajustes de la plantilla no son válidos.",
+  Şablonlar: "Plantillas",
+  "Şablonu ve rengi editörde istediğin zaman değiştirebilirsin.":
+    "Puedes cambiar la plantilla y el color en el editor cuando quieras.",
+  Şablonun: "Plantilla",
+  "Şablonun rengi": "Color de la plantilla",
+  "Şablonun yazı tipi: {0}": "Tipografía de la plantilla: {0}",
+  "Şimdi değil": "Ahora no",
+  "Takı ve aksesuar": "Joyería y accesorios",
+  "Tam süreyi yazmak için dokun": "Toca para escribir un tiempo exacto",
+  Tamam: "Aceptar",
+  "Tanınıyor…": "Reconociendo…",
+  "Taslağa devam et: ": "Continuar borrador: ",
+  "Taslağı sil": "Eliminar borrador",
+  "Taslağına devam et": "Retoma tu borrador",
+  Taslak: "Borrador",
+  "Taslak kaydedilemedi": "No se pudo guardar el borrador",
+  "Taslak kaydedilemedi. Değişikliklerin şimdilik yalnızca bu ekranda; yer açıp tekrar dene.":
+    "No se pudo guardar el borrador. Tus cambios solo están en esta pantalla por ahora; libera espacio e inténtalo de nuevo.",
+  "Taslak yok": "Sin borradores",
+  Taslaklar: "Borradores",
+  "Tekrar dene": "Reintentar",
+  "Telefonda yer kalmadı. Biraz yer açıp tekrar dene.":
+    "Tu teléfono se ha quedado sin espacio. Libera algo de espacio e inténtalo de nuevo.",
+  "Telefonunda hazırlanır": "Se crea en tu teléfono",
+  "Telefonundaki videoları kırp, birleştir, altyazı ekle.":
+    "Recorta y une los vídeos de tu teléfono y añade subtítulos.",
+  Terrazzo: "Terrazo",
+  "Terrazzo indirim": "Rebajas terrazo",
+  "Terrazzo vitrin": "Escaparate terrazo",
+  "Toplam ": "Total ",
+  "Toplu video": "Lote",
+  "Toplu video (10 fotoğrafa kadar)": "Lote (hasta 10 fotos)",
+  Traverten: "Travertino",
+  "Traverten ışık": "Luz travertino",
+  "Traverten mağaza": "Tienda travertino",
+  "Trendyol · 1200×1800": "Trendyol · 1200×1800",
+  "Trendyol 720×1280 önerir; bu yüzden 720p ile başlar.":
+    "Trendyol recomienda 720×1280, así que empieza en 720p.",
+  "Trendyol görsellerde fiyat ve indirim yazısını reddediyor; ürün sayfası videosunda boş bırakmak daha güvenli.":
+    "Trendyol rechaza los textos de precio y descuento en las imágenes; para un vídeo de página de producto es más seguro dejarlos vacíos.",
+  Turkuaz: "Turquesa",
+  Turuncu: "Naranja",
+  "Tüm sunucu projeleri ve medya kalıcı olarak silinir.":
+    "Todos los proyectos y archivos multimedia del servidor se eliminarán de forma permanente.",
+  "Tüm şablonlar": "Todas las plantillas",
+  Tümü: "Todo",
+  Türkçe: "Turco",
+  Unut: "Olvidar",
+  "Uygulama arka plana geçtiği için dışa aktarma durdu. Tekrar dene.":
+    "La exportación se detuvo porque la app pasó a segundo plano. Inténtalo de nuevo.",
+  "Uygulama arka plana geçtiği için video durduruldu. Video hazırlanırken Vidora'yı açık tut.":
+    "El vídeo se detuvo porque la app pasó a segundo plano. Mantén Vidora abierta mientras se crea.",
+  "Uygulamayı kapatıp tekrar dene.": "Cierra la app e inténtalo de nuevo.",
+  "Üretimi başlat": "Iniciar generación",
+  Üretimler: "Trabajos",
+  "Ürün adı": "Nombre del producto",
+  "Ürün arka plandan ayrılamadı. Tekrar dene.":
+    "No se pudo recortar el producto. Inténtalo de nuevo.",
+  "Ürün arka plandan ayrılıyor…": "Recortando el producto…",
+  "Ürün arka plandan telefonunda ayrılır.":
+    "El producto se recorta en tu teléfono.",
+  "Ürün ayrılırken uygulama arka plana geçti. Tekrar dene.":
+    "La app pasó a segundo plano mientras se recortaba el producto. Inténtalo de nuevo.",
+  "Ürün fotoğrafın telefonundan çıkmaz. Yapay zekâ yalnızca boş bir sahne çizer; ürünün telefonunda üstüne yerleştirilir.":
+    "Tu foto de producto no sale de tu teléfono. La IA solo dibuja una escena vacía; tu producto se coloca encima en tu teléfono.",
+  "Ürün fotoğrafından yaptığın videolar burada görünür.":
+    "Los vídeos que crees a partir de una foto de producto aparecen aquí.",
+  "Ürün fotoğrafını seç": "Elige una foto de producto",
+  "Ürün fotoğrafların, ayırma sonuçların ve videoların yalnızca bu cihazda işlenir ve saklanır. Vidora hesap açtırmaz ve seni takip etmez. Uygulama açılırken güncelleme olup olmadığına bakar; bu istek uygulama sürümünü, platformu, rastgele bir kurulum kimliğini ve IP adresini (çökme sonrasında kısa bir hata günlüğünü de) Expo'nun güncelleme hizmetine iletir, seninle ilişkilendirilmez ve takip için kullanılmaz.":
+    "Tus fotos de producto, recortes y vídeos se procesan y guardan solo en este dispositivo. Vidora no tiene cuentas y no te rastrea. Al abrirse, la app busca actualizaciones; esto envía la versión de la app, la plataforma, un ID de instalación aleatorio y tu dirección IP (tras un fallo, también un breve registro de error) al servicio de actualizaciones de Expo, y no se vincula contigo ni se usa para rastreo.",
+  "Ürün ışıltıyla sahneye çıkar, ardından başlık ve fiyat gelir.":
+    "El producto sube a escena con un destello, luego llegan el título y el precio.",
+  "Ürün kategorisi": "Categoría del producto",
+  "Ürün küçülmesin diye buton yazısı bu videoda gösterilmiyor.":
+    "El texto del botón se omite en este vídeo para que el producto siga grande.",
+  "Ürün küçülmesin diye buton yazısı ve etiket bu videoda gösterilmiyor.":
+    "El texto del botón y la etiqueta se omiten en este vídeo para que el producto siga grande.",
+  "Ürün küçülmesin diye etiket bu videoda gösterilmiyor.":
+    "La etiqueta se omite en este vídeo para que el producto siga grande.",
+  "Ürün tanıtımı": "Promoción de producto",
+  "Ürün videosu": "Vídeo de producto",
+  "Ürün videosu için uygulamanın yeni iOS derlemesi gerekir.":
+    "Los vídeos de producto requieren la compilación más reciente de la app para iOS.",
+  "Ürün videosu iptal edildi.": "Se canceló el vídeo de producto.",
+  "Ürün videosu oluştur": "Crear vídeo de producto",
+  "Ürün yansımalı zeminde sağa sola döner; ışık her dönüşte üzerinden geçer.":
+    "El producto gira a izquierda y derecha sobre un suelo reflectante, captando la luz.",
+  "Ürün, seçtiğin zeminde": "Tu producto sobre el fondo elegido",
+  "Ürünü arka plandan ayırmak için iOS 17 veya üstü gerekir.":
+    "Para recortar el producto hace falta iOS 17 o posterior.",
+  "ÜRÜNÜN\nFOTOĞRAFI": "FOTO\nDE TU PRODUCTO",
+  "Ürünün olduğu gibi kalır, video telefonunda hazırlanır":
+    "Tu producto se queda tal cual; el vídeo se crea en tu teléfono",
+  "Ürünün yeniden çizilmez": "Tu producto nunca se redibuja",
+  "Ürünün yeniden çizilmez.": "Tu producto nunca se redibuja.",
+  "Ürünün, gerçek bir sahnede": "Tu producto, en una escena real",
+  Üst: "Arriba",
+  "Üstü çizili": "Tachado arriba",
+  Varyasyon: "Variaciones",
+  Vazgeç: "Cancelar",
+  Veri: "Datos",
+  Video: "Vídeo",
+  "Video 1,5 GB sınırını aşıyor. Daha kısa bir bölüm seç.":
+    "El vídeo supera el límite de 1,5 GB. Elige una parte más corta.",
+  "Video 1:1": "Vídeo 1:1",
+  "Video 4:5": "Vídeo 4:5",
+  "Video 64 MiB sınırını aşıyor.": "El vídeo supera los 64 MiB.",
+  "Video 9:16": "Vídeo 9:16",
+  "Video başına ödeme yok": "Sin cargos por vídeo",
+  "Video düzenlemesi · ": "Edición de vídeo · ",
+  "Video hazır": "Vídeo listo",
+  "Video hazır ve Kitaplık'a eklendi.":
+    "El vídeo está listo y en tu biblioteca.",
+  "Video hazırlanamadı. Tekrar dene.":
+    "No se pudo crear el vídeo. Inténtalo de nuevo.",
+  "Video hazırlanırken uygulama arka plana alındı. Tekrar dene.":
+    "La app pasó a segundo plano mientras se creaba el vídeo. Inténtalo de nuevo.",
+  "Video hazırlanıyor": "Se está creando el vídeo",
+  "Video hazırlanıyor…": "Creando el vídeo…",
+  "Video iptal edildi.": "Vídeo cancelado.",
+  "Video iş istasyonunda yazıya çevrilir. Sonucu paylaşmadan önce gözden geçir.":
+    "La estación de trabajo transcribe el vídeo. Revisa el resultado antes de compartirlo.",
+  "Video karesi": "Fotograma del vídeo",
+  "Video kullanım hakkı": "Derechos de uso del vídeo",
+  "Video oluşturmak için": "Para crear vídeos",
+  "Video önizlemesi": "Vista previa del vídeo",
+  "Video seç": "Seleccionar vídeos",
+  "Video süresi 8 ile 30 saniye arasında olmalı.":
+    "La duración del vídeo debe estar entre 8 y 30 segundos.",
+  "Video üretimi tamamen kendi bilgisayarında çalışır; Vidora bir bulut sunucusu sağlamaz. Uygulamadaki düzenleyici iş istasyonu olmadan da çalışır.":
+    "La generación de vídeo funciona por completo en tu propio ordenador; Vidora no ofrece un servidor en la nube. El editor de la app funciona sin estación de trabajo.",
+  "Videodaki bir fotoğraf açılamadı. Fotoğrafı yeniden seç.":
+    "No se pudo abrir una foto del vídeo. Vuelve a elegirla.",
+  Videolar: "Vídeos",
+  "Videolar, taslaklar, içe aktarılan klipler, müzikler ve kurgu projeleri bu iPhone'dan silinir. Fotoğraflar'a kaydettiklerin kalır. Bu işlem geri alınamaz.":
+    "Los vídeos, borradores, clips importados, música y proyectos de edición se eliminan de este iPhone. Lo que guardaste en Fotos se mantiene. Esto no se puede deshacer.",
+  "Videolar, taslaklar, içe aktarılan klipler, müzikler, kurgu projeleri ve kayıtlı iş istasyonu eşleştirmesi bu iPhone'dan silinir. Fotoğraflar'a kaydettiklerin kalır. Bu işlem geri alınamaz.":
+    "Los vídeos, borradores, clips importados, música, proyectos de edición y el emparejamiento guardado con la estación de trabajo se eliminan de este iPhone. Lo que guardaste en Fotos se mantiene. Esto no se puede deshacer.",
+  "Videoları oluştur": "Crear vídeos",
+  "Videolarını ve görsellerini kaydet": "Guarda tus vídeos e imágenes",
+  "Videon hazır": "Tu vídeo está listo",
+  "Videonu oluştur ve kaydet": "Crea y guarda tu vídeo",
+  "Videonun süresi okunamadı.": "No se pudo leer la duración del vídeo.",
+  "Videoyu açar.": "Abre el vídeo.",
+  "Videoyu duraklat": "Pausar vídeo",
+  "Videoyu kullanma hakkım var.": "Tengo derecho a usar este vídeo.",
+  "Videoyu oluştur": "Crear vídeo",
+  "Videoyu oynat": "Reproducir vídeo",
+  "Videoyu sil": "Eliminar vídeo",
+  "Vidora aşağıdaki üçüncü taraf içerikleri kullanır. Hepsi cihazda çalışır.":
+    "Vidora incluye el contenido de terceros que se indica abajo. Todo funciona en el dispositivo.",
+  "Vidora hesap açtırmaz ve seni takip etmez.":
+    "Vidora no tiene cuentas y no te rastrea.",
+  "Vidora Pro etkin. Teşekkürler!": "Vidora Pro está activo. ¡Gracias!",
+  "Vidora Pro etkin. Videoyu oluşturabilirsin.":
+    "Vidora Pro está activo. Ya puedes crear el vídeo.",
+  "Vidora Pro geri yüklendi": "Vidora Pro restaurado",
+  "Vidora Pro geri yüklendi.": "Vidora Pro restaurado.",
+  "Vidora Pro geri yüklendi. Teşekkürler!": "Vidora Pro restaurado. ¡Gracias!",
+  "Vidora Pro'ya geç": "Obtener Vidora Pro",
+  "Vidora Pro'yu seç ve Aboneliği İptal Et'e dokun.":
+    "Elige Vidora Pro y toca «Cancelar suscripción».",
+  "Vidora sürüm ": "Vidora versión ",
+  "Vidora'nın diğer tüm özellikleri telefonunda çalışmaya devam eder. AI Sahne'yi kullanmayı bıraktığında hiçbir şey gönderilmez.":
+    "Todas las demás funciones de Vidora siguen funcionando en tu teléfono. Si dejas de usar Escena IA, no se envía nada.",
+  Vitrin: "Escaparate",
+  "Vurgu rengi": "Color de acento",
+  Vurgulu: "Resaltado",
+  "Yalnızca cihazdaki dosyalar desteklenir.":
+    "Solo se admiten archivos del dispositivo.",
+  "Yalnızca kullanma hakkın olan müziği ekle.":
+    "Añade solo música de la que tengas derechos de uso.",
+  "Yalnızca sunucu adresini gir; yol, sorgu veya # ekleme.":
+    "Introduce solo la dirección del servidor, sin ruta, consulta ni #.",
+  "Yapay zekâ sahnesi": "Escena IA",
+  "Yapay zekâ stüdyosu bu sürümde henüz açık değil.":
+    "El estudio IA aún no está disponible en esta versión.",
+  "Yapay zekâ yalnızca boş sahneyi çizer; ürünün telefonunda, olduğu gibi üstüne yerleştirilir.":
+    "La IA solo dibuja la escena vacía; tu producto se coloca encima en tu teléfono, tal cual es.",
+  "Yapay zekâ yanıt vermedi. Hakkın düşülmedi; tekrar dene.":
+    "La IA no respondió. No se descontó nada; inténtalo de nuevo.",
+  "Yapay zekâyla metin önerileri": "Sugerencias de texto con IA",
+  "Yapay zekâyla öneri al": "Obtener sugerencias de IA",
+  "Yavaş kamera yaklaşması, ürünün üzerinde gezen ışık.":
+    "Un acercamiento lento mientras la luz se desliza sobre el producto.",
+  Yazı: "Texto",
+  "Yazı rengi": "Color del texto",
+  "Yazı tipi": "Tipografía",
+  "Yeni proje": "Proyecto nuevo",
+  "Yeni proje adı": "Nombre del proyecto nuevo",
+  "Yeni proje başlat": "Empezar un proyecto nuevo",
+  "Yeni proje başlatılsın mı?": "¿Empezar un proyecto nuevo?",
+  "Yeni sahneler oluştur ({0})": "Crear escenas nuevas ({0})",
+  "Yeni video": "Vídeo nuevo",
+  "Yeni video bunun yerini alır. Farklı bir sürüm için Çoğalt.":
+    "El vídeo nuevo reemplaza a este. Usa Duplicar para otra versión.",
+  "Yeni videolar bu renk ve yazı tipiyle başlar. İstediğin zaman videoda değiştirebilirsin.":
+    "Los vídeos nuevos empiezan con este color y esta tipografía. Aun así puedes cambiarlos en el vídeo.",
+  "Yeniden adlandır": "Renombrar",
+  "Yeniden adlandır ya da yeni proje başlat":
+    "Renombrar o empezar un proyecto nuevo",
+  "Yeniden dene": "Reintentar",
+  "Yeniden oluştur": "Generar de nuevo",
+  "Yeniden oluşturulsun mu?": "¿Generar de nuevo?",
+  Yenile: "Rehacer",
+  "Yerel düzenleyici, medya ve çıktıları uygulama alanında saklar. Üretim motoruna gönderilen sahne tarifleri ve görseller yalnızca eşleştirdiğin kendi iş istasyonuna iletilir. İş istasyonu adresi ve erişim anahtarı bu cihazın iOS Anahtar Zinciri'nde saklanır. İş istasyonundaki verilerini AI Stüdyo ekranından silebilirsin.":
+    "El editor local guarda los archivos y exportaciones dentro de esta app. Las indicaciones de generación y las imágenes solo van a la estación de trabajo que emparejes. La dirección de la estación y la clave de acceso se guardan en el llavero de iOS de este dispositivo. Elimina los datos de tu estación de trabajo desde la pantalla Estudio IA.",
+  "Yerel kitaplığı temizle": "Vaciar la biblioteca local",
+  "Yerel kitaplık temizlensin mi?": "¿Vaciar la biblioteca local?",
+  Yerleşim: "Encuadre",
+  Yeşil: "Verde",
+  "yılda ~{0}": "~{0} al año",
+  "yılda bir faturalanır": "se factura una vez al año",
+  Yıllık: "Anual",
+  Yok: "Ninguno",
+  "Yukarı taşı": "Mover arriba",
+  Yuvarlak: "Redondeada",
+  "Zaman çizelgesinden çıkar": "Quitar de la línea de tiempo",
+  "Zaman çizelgesine en fazla {0} klip sığar; fazlası kitaplıkta.":
+    "La línea de tiempo admite hasta {0} clips; el resto se queda en la biblioteca.",
+  Zarif: "Elegante",
+  Zemin: "Fondo",
+  "Zemin görseli açılamadı. Başka bir zemin ya da renk seç.":
+    "No se pudo abrir la imagen de fondo. Elige otro fondo u otro color.",
+  Zümrüt: "Esmeralda",
+  "Zümrüt detay": "Detalle esmeralda",
+  "Zümrüt kampanya": "Campaña esmeralda",
+  "Ürün ayrılamadı. Tekrar dene.":
+    "No se pudo recortar el producto. Inténtalo de nuevo.",
+  "Ürün karede küçük kalmış: daha yakından çekersen yakın planlar net çıkar.":
+    "El producto se ve pequeño en la foto: acércate más y los primeros planos saldrán más nítidos.",
+  "Ürün zeminden tam ayrılmamış olabilir. Sade bir zeminde tekrar çek.":
+    "Puede que el producto no esté totalmente separado. Vuelve a hacer la foto sobre un fondo liso.",
+  "Yeni Koleksiyon": "Nueva colección",
+};

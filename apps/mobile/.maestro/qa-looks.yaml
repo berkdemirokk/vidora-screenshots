@@ -1,0 +1,70 @@
+# QA: the Şablon tool's "Görünümler" mode (looks drawn with the product),
+# two looks chosen, the row swiped, and the category sheet (category-menu).
+# Independent flow: relaunch, new editor with the sample product. The
+# workflow records the screen for the whole flow (qa-media/looks.mp4), so the
+# first poster drawing is on the recording.
+appId: com.berkdemirok.vidora
+---
+- runFlow:
+    file: qa-prep.yaml
+- runFlow:
+    when:
+      notVisible:
+        id: "template-mode-looks"
+    commands:
+      - tapOn:
+          id: "tool-template"
+- tapOn:
+    id: "template-mode-looks"
+- extendedWaitUntil:
+    visible:
+      id: "look-.*"
+    timeout: 20000
+- takeScreenshot: ${OUT}/11a-looks-drawing
+# Posters draw for a few seconds: a plain 8 s wait.
+- extendedWaitUntil:
+    visible: "__qa_wait_never_present__"
+    timeout: 8000
+    optional: true
+- takeScreenshot: ${OUT}/11b-looks-drawn
+- tapOn:
+    id: "look-.*"
+    index: 0
+- extendedWaitUntil:
+    notVisible: "Önizleme hazırlanıyor|Preparing the preview"
+    timeout: 120000
+    optional: true
+- takeScreenshot: ${OUT}/11c-look-1
+- tapOn:
+    id: "look-.*"
+    index: 2
+- extendedWaitUntil:
+    notVisible: "Önizleme hazırlanıyor|Preparing the preview"
+    timeout: 120000
+    optional: true
+- takeScreenshot: ${OUT}/11d-look-2
+# Swipe the looks row sideways (started on a visible look).
+- swipe:
+    from:
+      id: "look-.*"
+      index: 1
+    direction: LEFT
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/11e-looks-swiped
+# Category sheet.
+- tapOn:
+    id: "category-menu"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/11f-category-sheet
+- tapOn: "Vazgeç|Cancel"
+- assertVisible:
+    id: "category-menu"
+# Templates mode, for the same panel in its other state.
+- tapOn:
+    id: "template-mode-templates"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/11g-templates-mode

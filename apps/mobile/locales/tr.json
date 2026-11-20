@@ -1,0 +1,6 @@
+{
+  "NSPhotoLibraryUsageDescription": "Vidora, seçtiğin fotoğrafı ürününü kesip reklam videosunu hazırlamak için kullanır. Fotoğraflar iPhone'unda kalır.",
+  "NSPhotoLibraryAddUsageDescription": "Vidora, oluşturduğun videoları fotoğraf arşivine kaydeder.",
+  "NSSpeechRecognitionUsageDescription": "Vidora, videolarındaki konuşmayı altyazıya dönüştürmek için konuşma tanımayı kullanır. Cihaz içi tanıma yoksa ses Apple tarafından işlenebilir.",
+  "NSCameraUsageDescription": "Vidora, ürününün reklam videosu için fotoğrafını çekebilmen amacıyla kamerayı kullanır."
+}

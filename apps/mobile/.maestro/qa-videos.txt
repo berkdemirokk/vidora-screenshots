@@ -1,0 +1,14 @@
+# Videos for the QA workflow: one per line, each rendered by its own
+# "maestro test qa-render.yaml" run and saved to Photos. Fields:
+# NAME | KIND | TEMPLATE | BG | RATIO | STILL | DEST
+# KIND kind-<id>, TEMPLATE template-<id>, BG backdrop-<id> or palette-<id>,
+# RATIO 9x16/4x5/1x1, STILL a ratio for an extra still ("" = none),
+# DEST social/marketplace ("" = default). Video 0 (own photo) is in qa-own.yaml.
+1-vitrin-marble-white-9x16 | promotion | showcase | backdrop-marble-white | 9x16 | 4x5 |
+2-editoryal-paper-sand-4x5 | advertisement | editorial | backdrop-paper-sand | 4x5 | |
+3-indirim-terrazzo-1x1 | advertisement | discount | backdrop-terrazzo | 1x1 | |
+4-detay-walnut-9x16 | promotion | detail | backdrop-walnut | 9x16 | |
+5-minimal-palette-ivory-9x16 | promotion | minimal | palette-ivory | 9x16 | |
+6-kampanya-marble-black-1x1 | advertisement | campaign | backdrop-marble-black | 1x1 | |
+7-vitrin-social-9x16 | promotion | showcase | backdrop-concrete | 9x16 | | social
+8-vitrin-marketplace-9x16 | promotion | showcase | backdrop-concrete | 9x16 | | marketplace

@@ -1,0 +1,16 @@
+# QA flow: relaunch and capture Home (with the videos made earlier) under
+# whatever system setting the workflow just changed (e.g. Reduce Motion).
+# Env SHOT: screenshot name.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}
+- scroll
+- takeScreenshot: ${OUT}/${SHOT}-scrolled

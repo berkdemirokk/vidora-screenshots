@@ -1,0 +1,129 @@
+{
+  "expo": {
+    "name": "Vidora",
+    "slug": "karevia-studio",
+    "version": "1.1.0",
+    "scheme": "vidora",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "bundleIdentifier": "com.berkdemirok.vidora",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "usesAppleSignIn": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Vidora uses the photo you choose to cut out your product and make its ad video. Photos stay on your iPhone.",
+        "NSCameraUsageDescription": "Vidora uses the camera so you can photograph your product for its ad video.",
+        "NSPhotoLibraryAddUsageDescription": "Vidora saves the videos you create to your photo library.",
+        "NSSpeechRecognitionUsageDescription": "Vidora uses speech recognition to turn the speech in your videos into captions. When on-device recognition is not available, audio may be processed by Apple.",
+        "CFBundleAllowMixedLocalizations": true
+      },
+      "privacyManifests": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyCollectedDataTypes": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "C617.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "E174.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "35F9.1"
+            ]
+          }
+        ]
+      }
+    },
+    "locales": {
+      "tr": "./locales/tr.json",
+      "en": "./locales/en.json",
+      "de": "./locales/de.json",
+      "es": "./locales/es.json",
+      "fr": "./locales/fr.json",
+      "pt-BR": "./locales/pt-BR.json",
+      "it": "./locales/it.json"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-apple-authentication",
+      "expo-localization",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Vidora opens your photo library so you can choose product photos and videos. They are processed on your iPhone and are not uploaded.",
+          "cameraPermission": "Vidora uses the camera so you can photograph a product and turn it into a video. Photos are processed on your iPhone and are not uploaded.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Vidora opens your photo library so you can choose product photos and videos. They are processed on your iPhone and are not uploaded.",
+          "savePhotosPermission": "Vidora saves the videos and images you create to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "imageWidth": 128,
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      "expo-sharing",
+      "expo-status-bar",
+      "expo-video",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          }
+        }
+      ],
+      "expo-asset"
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        },
+        "sitemap": false
+      },
+      "eas": {
+        "projectId": "d3676a4f-6c48-4b80-a2ed-8f3201f66e3e"
+      }
+    },
+    "owner": "berkdemirok",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d3676a4f-6c48-4b80-a2ed-8f3201f66e3e",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
+  }
+}

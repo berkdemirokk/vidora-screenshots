@@ -1,0 +1,44 @@
+name: Sample cut-out
+
+# Runs Apple's subject lifting on the macOS host (the simulator has none) over
+# the bundled sample photo and uploads the cut-out PNG. Two uses: it shows
+# whether Vision finds the product in the photo at all, and it produces the
+# pre-made cut-out the app can fall back to. No app build; a few minutes.
+on:
+  workflow_dispatch:
+    inputs:
+      photo:
+        description: Photo to cut out, relative to the repository root
+        required: false
+        default: apps/mobile/assets/sample-product.jpg
+
+jobs:
+  cutout:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host
+        run: |
+          sw_vers
+          swiftc --version
+      - name: Build the tool
+        run: swiftc -O tools/vision_cutout.swift -o "$RUNNER_TEMP/vision_cutout"
+      - name: Cut out
+        env:
+          PHOTO: ${{ inputs.photo }}
+        run: |
+          mkdir -p out
+          set +e
+          "$RUNNER_TEMP/vision_cutout" "$PHOTO" out/sample-product-cutout.png | tee out/result.txt
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "exit code $code" | tee -a out/result.txt
+          ls -la out
+          sips -g pixelWidth -g pixelHeight -g hasAlpha out/sample-product-cutout.png || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sample-cutout
+          path: out
+          if-no-files-found: warn

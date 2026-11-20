@@ -1,0 +1,91 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { buildSpec, specProblems, MAX_SCENES } from "./product-templates.ts";
+
+const base = {
+  template: "campaign",
+  palette: "noir",
+  product: "file:///tmp/product.png",
+  headline: "Gül & Amber Eau de Parfum",
+  price: "1.249 TL",
+  badge: "%30 indirim",
+  cta: "Hemen sipariş ver",
+  quality: "1080p",
+  watermark: false,
+  music: null,
+};
+
+const scene = (start, over = {}) => ({
+  start,
+  image: "file:///tmp/s" + start + ".png",
+  mode: "photo",
+  keys: [],
+  transition: { kind: "cut", duration: 0 },
+  ...over,
+});
+
+const withScenes = (scenes, duration = 9) => ({
+  ...buildSpec(base),
+  duration,
+  scenes,
+});
+
+test("spec without scenes passes unchanged", () => {
+  const spec = buildSpec(base);
+  assert.equal("scenes" in spec, false);
+  assert.deepEqual(specProblems(spec), []);
+});
+
+test("valid scenes pass", () => {
+  assert.deepEqual(specProblems(withScenes([scene(0), scene(4)])), []);
+});
+
+test("scenes must start at 0 and increase", () => {
+  const p = specProblems(withScenes([scene(0), scene(2), scene(1.5)]));
+  assert.ok(p.some((x) => x.includes("scenes")), p.join());
+  const q = specProblems(withScenes([scene(1), scene(3)]));
+  assert.ok(q.some((x) => x.includes("scenes")), q.join());
+});
+
+test("more than 8 scenes is a problem", () => {
+  const many = Array.from({ length: MAX_SCENES + 1 }, (_, i) => scene(i));
+  assert.ok(specProblems(withScenes(many)).length > 0);
+});
+
+test("missing scene image is a spec problem", () => {
+  const p = specProblems(withScenes([scene(0), scene(3, { image: "" })]));
+  assert.ok(p.some((x) => x.includes("image")), p.join());
+});
+
+test("scene start past duration is a problem", () => {
+  const p = specProblems(withScenes([scene(0), scene(9.2)], 9));
+  assert.ok(p.some((x) => x.includes("scenes")), p.join());
+});
+
+test("transition longer than 1.5 s is a problem", () => {
+  const long = { kind: "push", duration: 1.6 };
+  const neg = { kind: "push", duration: -0.1 };
+  for (const transition of [long, neg])
+    assert.ok(
+      specProblems(withScenes([scene(0), scene(3, { transition })])).length > 0,
+    );
+  assert.deepEqual(
+    specProblems(
+      withScenes([scene(0), scene(3, { transition: { kind: "wipe", duration: 1.5 } })]),
+    ),
+    [],
+  );
+});
+
+test("invalid scene mode, keys and shade are problems", () => {
+  const cases = [
+    ["mode", { mode: "x" }],
+    ["keys", { keys: null }],
+    ["shade", { shade: 1.2 }],
+    ["shade", { shade: -0.1 }],
+  ];
+  for (const [word, over] of cases) {
+    const p = specProblems(withScenes([scene(0), scene(3, over)]));
+    assert.ok(p.some((x) => x.includes(word)), word + ": " + p.join());
+  }
+});

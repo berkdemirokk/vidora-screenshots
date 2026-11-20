@@ -1,0 +1,26 @@
+# QA helper: a known starting state for an independent flow. Relaunches the
+# app (keeping its data), lands on Home, opens a new editor with the sample
+# product and waits for the cut-out and the first playing preview.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- tapOn:
+    id: "home-create"
+- extendedWaitUntil:
+    visible:
+      id: "sample-product"
+    timeout: 30000
+- tapOn:
+    id: "sample-product"
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "Video önizlemesi|Video preview"
+    timeout: 60000

@@ -1,0 +1,39 @@
+{
+  "cli": {
+    "version": ">= 18.12.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SCREENSHOT_MODE": "0",
+        "EXPO_PUBLIC_ACCOUNTS": "1"
+      },
+      "channel": "preview"
+    },
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SCREENSHOT_MODE": "0",
+        "EXPO_PUBLIC_ACCOUNTS": "1"
+      },
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6835087523"
+      }
+    }
+  }
+}

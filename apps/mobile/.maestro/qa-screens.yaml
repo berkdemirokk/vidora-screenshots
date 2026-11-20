@@ -1,0 +1,135 @@
+# QA flow "screens" (independent, Turkish): Home with the videos made by the
+# earlier flows → Library (videos, Seç with two tiles, long-press menu,
+# drafts, cold launch) → video detail for a 9:16 and a 1:1 export →
+# Settings → licences. The paywall has its own flow (qa-paywall.yaml).
+# Every navigation is asserted; steps that need videos run only when a
+# video tile ("<name>, m:ss") exists, otherwise the empty state is recorded.
+#   maestro test -e OUT=qa apps/mobile/.maestro/qa-screens.yaml
+appId: com.berkdemirok.vidora
+---
+# Home with videos.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/20-home-with-videos
+- scroll
+- takeScreenshot: ${OUT}/20b-home-scrolled
+
+# Library.
+- tapOn:
+    id: "tab-library"
+- extendedWaitUntil:
+    visible:
+      id: "library-segment"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/21-library-videos
+- runFlow:
+    when:
+      notVisible: ".*, .*, .*(saniye|dakika|second|minute).*"
+    commands:
+      - takeScreenshot: ${OUT}/21x-library-empty-no-videos
+- runFlow:
+    when:
+      visible: ".*, .*, .*(saniye|dakika|second|minute).*"
+    commands:
+      # Seç with two tiles chosen.
+      - tapOn:
+          id: "library-select"
+      - assertVisible: "Bitti|Done"
+      - tapOn:
+          text: ".*, .*, .*(saniye|dakika|second|minute).*"
+          index: 0
+      - tapOn:
+          text: ".*, .*, .*(saniye|dakika|second|minute).*"
+          index: 1
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - takeScreenshot: ${OUT}/21b-library-select-two
+      - tapOn:
+          id: "library-select"
+      - assertVisible: "Seç|Select"
+      # Long-press menu on the first tile.
+      - longPressOn:
+          text: ".*, .*, .*(saniye|dakika|second|minute).*"
+          index: 0
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - takeScreenshot: ${OUT}/21c-library-long-press
+      # Native context menu: dismiss by tapping outside it.
+      - tapOn:
+          point: "50%, 6%"
+      - assertVisible:
+          id: "library-segment"
+- tapOn:
+    text: "Taslaklar|Drafts"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/22-library-drafts
+- tapOn:
+    text: "Videolar|Videos"
+
+# Video detail: a 9:16 ("Dikey") and a 1:1 ("Kare") export.
+- runFlow:
+    when:
+      visible: ".*, .*, .*(saniye|dakika|second|minute).*"
+    commands:
+      - runFlow:
+          file: qa-detail-one.yaml
+          env:
+            TILE: ".*, (Dikey|Vertical), .*"
+            SHOT: "23-video-detail-9x16"
+      - runFlow:
+          file: qa-detail-one.yaml
+          env:
+            TILE: ".*, (Kare|Square), .*"
+            SHOT: "24-video-detail-1x1"
+
+# Cold launch straight into Library (the tab the app restores, or tapped).
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-library"
+    timeout: 60000
+- tapOn:
+    id: "tab-library"
+- extendedWaitUntil:
+    visible:
+      id: "library-segment"
+    timeout: 10000
+- takeScreenshot: ${OUT}/22b-library-cold-launch
+
+# Settings, licences.
+- tapOn:
+    id: "tab-settings"
+- extendedWaitUntil:
+    visible: "Satın alımları geri yükle|Restore purchases"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/25-settings-top
+- scrollUntilVisible:
+    element:
+      text: "Lisanslar|Licenses"
+    direction: DOWN
+    speed: 20
+- scroll
+- takeScreenshot: ${OUT}/26-settings-bottom
+- tapOn: "Lisanslar|Licenses"
+- extendedWaitUntil:
+    visible: ".*Lisansın tam metni.*|.*[Ff]ull licen.*"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/27-licenses
+- tapOn: "Geri|Back"
+- extendedWaitUntil:
+    visible: "Satın alımları geri yükle|Restore purchases"
+    timeout: 10000

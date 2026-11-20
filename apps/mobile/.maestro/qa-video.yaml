@@ -1,0 +1,217 @@
+# QA subflow: set up one video in the editor, render it, save it to Photos.
+# Called from qa.yaml with env:
+#   NAME      file-name prefix for the screenshots
+#   KIND      unused since the kind rows were removed (kept for the list format)
+#   TEMPLATE  template-<id>  (showcase, editorial, discount, detail, minimal, campaign, …)
+#   BG        backdrop-<id> or palette-<id> (e.g. backdrop-walnut, palette-ivory)
+#   RATIO     ratio-<id>     (9x16, 4x5, 1x1)
+#   STILL     a ratio id ("4x5") to also save the end card as an image in
+#             that ratio before rendering, or "" for none
+#   BG "keep" keeps the current backdrop (own photo from qa-own.yaml)
+#   DEST      optional destination: dest-<id> ("social", "marketplace")
+# Starts in the editor or on a result. Every choice is asserted as selected.
+appId: com.berkdemirok.vidora
+---
+- runFlow:
+    when:
+      visible:
+        id: "result-edit"
+    commands:
+      - tapOn:
+          id: "result-edit"
+- assertVisible:
+    id: "render-button"
+
+# Template: Şablon tool → "Şablonlar" mode (the other mode is Görünümler)
+# → template-<id> in the sideways card row, asserted as selected.
+- runFlow:
+    when:
+      notVisible:
+        id: "template-mode-templates"
+    commands:
+      - tapOn:
+          id: "tool-template"
+- tapOn:
+    id: "template-mode-templates"
+- extendedWaitUntil:
+    visible:
+      id: "template-(?!mode-).*"
+    timeout: 10000
+- repeat:
+    times: 5
+    while:
+      notVisible:
+        id: "template-${TEMPLATE}"
+        selected: true
+    commands:
+      - tapOn:
+          id: "template-${TEMPLATE}"
+          optional: true
+      - runFlow:
+          when:
+            notVisible:
+              id: "template-${TEMPLATE}"
+              selected: true
+          commands:
+            - swipe:
+                from:
+                  id: "template-(?!mode-).*"
+                direction: LEFT
+                duration: 600
+- assertVisible:
+    id: "template-${TEMPLATE}"
+    selected: true
+
+# Backdrop or palette (two compact rows in the Arka plan panel).
+# BG "keep" leaves the current one (e.g. an own photo set by qa-own.yaml).
+- runFlow:
+    when:
+      true: "${BG !== 'keep'}"
+    commands:
+      # Open Arka plan explicitly and wait for its first real backdrop tile.
+      - runFlow:
+          when:
+            notVisible:
+              id: "backdrop-marble-white"
+          commands:
+            - tapOn:
+                id: "tool-background"
+      - extendedWaitUntil:
+          visible:
+            id: "backdrop-marble-white"
+          timeout: 15000
+      - repeat:
+          times: 6
+          while:
+            notVisible:
+              id: "${BG}"
+              selected: true
+          commands:
+            - tapOn:
+                id: "${BG}"
+                optional: true
+            - runFlow:
+                when:
+                  notVisible:
+                    id: "${BG}"
+                    selected: true
+                commands:
+                  # Backdrop tiles are one sideways row at ~76% of the screen
+                  # height (palettes at ~87% all fit). Swipe that row by
+                  # coordinates: a swipe that starts on the first tile
+                  # ("Kendi fotoğrafın") opens the photo picker.
+                  - swipe:
+                      start: "85%, 76%"
+                      end: "35%, 76%"
+                      duration: 600
+      - assertVisible:
+          id: "${BG}"
+          selected: true
+
+# Format: the video's ratio (an optional still comes after the video).
+- runFlow:
+    when:
+      notVisible:
+        id: "ratio-.*"
+    commands:
+      - tapOn:
+          id: "tool-format"
+- tapOn:
+    id: "ratio-${RATIO}"
+- assertVisible:
+    id: "ratio-${RATIO}"
+    selected: true
+# Destination ("Nerede paylaşacaksın?"): DEST "social" / "marketplace", or "".
+- runFlow:
+    when:
+      true: "${typeof DEST !== 'undefined' && DEST !== ''}"
+    commands:
+      - tapOn:
+          id: "dest-${DEST}"
+      - assertVisible:
+          id: "dest-${DEST}"
+          selected: true
+      - extendedWaitUntil:
+          notVisible: "Önizleme hazırlanıyor|Preparing the preview"
+          timeout: 120000
+          optional: true
+      - takeScreenshot: ${OUT}/video-${NAME}-destination
+
+- extendedWaitUntil:
+    notVisible: "Önizleme hazırlanıyor|Preparing the preview"
+    timeout: 120000
+    optional: true
+- takeScreenshot: ${OUT}/video-${NAME}-editor
+- runFlow:
+    when:
+      visible:
+        id: "dropped-note"
+    commands:
+      - takeScreenshot: ${OUT}/video-${NAME}-texts-dropped-note
+- tapOn:
+    id: "render-button"
+- extendedWaitUntil:
+    visible: "İptal|Cancel"
+    timeout: 15000
+    optional: true
+- takeScreenshot: ${OUT}/video-${NAME}-rendering
+- extendedWaitUntil:
+    visible:
+      id: "save-photos"
+    timeout: 900000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/video-${NAME}-result
+
+# A re-render replaces the draft's video in the app, so every render is
+# saved to Photos (the workflow copies the photo library out).
+- tapOn:
+    id: "save-photos"
+- tapOn:
+    text: "İzin Ver|Allow|Tam Erişime İzin Ver|Allow Full Access|Fotoğraf Ekle|Add Photos Only"
+    optional: true
+- extendedWaitUntil:
+    visible: "Fotoğraflar'a kaydedildi.|Saved to Photos."
+    timeout: 120000
+- takeScreenshot: ${OUT}/video-${NAME}-saved
+
+# Optional still in another ratio (STILL), after the video so a failing image
+# export cannot cost the render.
+- runFlow:
+    when:
+      true: "${STILL !== ''}"
+    commands:
+      - tapOn:
+          id: "result-edit"
+      - assertVisible:
+          id: "render-button"
+      - runFlow:
+          when:
+            notVisible:
+              id: "ratio-.*"
+          commands:
+            - tapOn:
+                id: "tool-format"
+      - tapOn:
+          id: "ratio-${STILL}"
+      - assertVisible:
+          id: "ratio-${STILL}"
+          selected: true
+      - extendedWaitUntil:
+          notVisible: "Önizleme hazırlanıyor|Preparing the preview"
+          timeout: 120000
+          optional: true
+      - takeScreenshot: ${OUT}/video-${NAME}-still-before
+      - tapOn:
+          id: "save-image"
+      - takeScreenshot: ${OUT}/video-${NAME}-still-sheet
+      - tapOn: "Son kare · 1080p|Last frame · 1080p"
+      - takeScreenshot: ${OUT}/video-${NAME}-still-after-tap
+      # Photos access is granted by the workflow; tap through if asked anyway.
+      - tapOn:
+          text: "İzin Ver|Allow|Tam Erişime İzin Ver|Allow Full Access|Fotoğraf Ekle|Add Photos Only"
+          optional: true
+      - extendedWaitUntil:
+          visible: "Görsel Fotoğraflar'a kaydedildi.|Image saved to Photos."
+          timeout: 60000
+      - takeScreenshot: ${OUT}/video-${NAME}-still-saved

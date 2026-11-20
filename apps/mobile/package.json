@@ -1,0 +1,41 @@
+{
+  "name": "@karevia/mobile",
+  "private": true,
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "typecheck": "tsc --noEmit",
+    "build": "expo export --platform ios --output-dir dist"
+  },
+  "dependencies": {
+    "expo": "~58.0.25",
+    "expo-apple-authentication": "~58.0.3",
+    "expo-asset": "~58.0.21",
+    "expo-build-properties": "~58.0.12",
+    "expo-constants": "~58.0.15",
+    "expo-crypto": "~58.0.8",
+    "expo-document-picker": "~58.0.5",
+    "expo-file-system": "~58.0.0",
+    "expo-font": "~58.0.12",
+    "expo-haptics": "~58.0.8",
+    "expo-image-picker": "~58.0.0",
+    "expo-linking": "~58.0.17",
+    "expo-localization": "~58.0.0",
+    "expo-media-library": "~58.0.0",
+    "expo-router": "~58.0.31",
+    "expo-secure-store": "~58.0.3",
+    "expo-sharing": "~58.0.23",
+    "expo-splash-screen": "~58.0.14",
+    "expo-status-bar": "~58.0.5",
+    "expo-store-review": "~58.0.3",
+    "expo-symbols": "~58.0.5",
+    "expo-updates": "~58.0.22",
+    "expo-video": "~58.0.14",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.11.1",
+    "react-native-screens": "~4.30.1"
+  }
+}

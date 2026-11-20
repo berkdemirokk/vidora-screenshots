@@ -1,0 +1,28 @@
+{
+  "name": "karevia-studio",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "^24.3.0"
+  },
+  "workspaces": [
+    "apps/mobile",
+    "apps/web"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces",
+    "lint": "eslint apps packages",
+    "format:check": "prettier --check \"apps/**/*.{ts,tsx,css,mjs}\" \"packages/**/*.{ts,mjs}\"",
+    "test": "node --test packages/shared/*.test.mjs apps/mobile/src/*.test.mjs",
+    "build": "npm run build -w apps/web && npm run build -w apps/mobile"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "@types/react": "^19.2.0",
+    "@types/node": "^24.0.0",
+    "prettier": "^3.8.1",
+    "eslint": "^9.39.0",
+    "typescript-eslint": "^8.55.0",
+    "playwright": "1.65.0"
+  }
+}

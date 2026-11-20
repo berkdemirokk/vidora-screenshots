@@ -1,0 +1,6 @@
+{
+  "NSPhotoLibraryUsageDescription": "Vidora uses the photo you choose to cut out your product and make its ad video. Photos stay on your iPhone.",
+  "NSPhotoLibraryAddUsageDescription": "Vidora saves the videos you create to your photo library.",
+  "NSSpeechRecognitionUsageDescription": "Vidora uses speech recognition to turn the speech in your videos into captions. When on-device recognition is not available, audio may be processed by Apple.",
+  "NSCameraUsageDescription": "Vidora uses the camera so you can photograph your product for its ad video."
+}

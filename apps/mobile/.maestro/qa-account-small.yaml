@@ -1,0 +1,36 @@
+# Small-screen check of the account screens (the account flow itself is skipped for this job):
+# Settings > account row > sign-in (acc-01) > create account (acc-02) > focus the password field
+# (acc-02-kb: do the field and the submit button stay visible above the keyboard?). Needs no network.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-settings"
+    timeout: 60000
+- tapOn:
+    id: "tab-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-account"
+    timeout: 20000
+- tapOn:
+    id: "settings-account"
+- extendedWaitUntil:
+    visible:
+      id: "account-screen"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-acc-01-signin
+- tapOn:
+    id: "account-mode-signup"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-acc-02-signup
+- tapOn:
+    id: "account-password"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-acc-02-kb

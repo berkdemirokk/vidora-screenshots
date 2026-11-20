@@ -1,0 +1,181 @@
+# QA flow "account" (optional e-mail accounts; bundle built with EXPO_PUBLIC_ACCOUNTS=1).
+# Talks to the real free Firebase project, so it needs network. Env (from the workflow, never
+# printed): EMAIL (qa+<epoch ms>@example.com) and PW (random, 16 characters).
+# Journey: Settings > account row > sign-in screen > sign-up (KVKK notice, consent) > signed in >
+# Settings shows the e-mail > sign out > sign in again > delete account > deleted (sign-in
+# with the same credentials must now fail) > invalid e-mail check.
+#   maestro test -e OUT=qa -e EMAIL=... -e PW=... apps/mobile/.maestro/qa-account.yaml
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-settings"
+    timeout: 60000
+- tapOn:
+    id: "tab-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-account"
+    timeout: 20000
+- tapOn:
+    id: "settings-account"
+- extendedWaitUntil:
+    visible:
+      id: "account-screen"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-acc-01-signin
+
+# Sign in with Apple: shown only where the device can (the simulator may not be signed in to an
+# Apple ID), so both checks are optional. The flow itself keeps using e-mail.
+- assertVisible:
+    id: "account-apple-signin"
+    optional: true
+- assertVisible:
+    id: "account-apple-or"
+    optional: true
+
+# Sign-up mode: KVKK notice and an unticked consent box; the submit button is dimmed.
+- tapOn:
+    id: "account-mode-signup"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-acc-02-signup
+
+# Fill in and submit. The password field's Return key is "go" and would submit, so each field is
+# tapped, typed into, and the keyboard is left by tapping the header area.
+- tapOn:
+    id: "account-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "account-password"
+- inputText: ${PW}
+- tapOn:
+    point: "50%, 12%"
+    optional: true
+- tapOn:
+    id: "account-consent"
+- tapOn:
+    id: "account-submit"
+- extendedWaitUntil:
+    visible:
+      id: "account-signed-email"
+    timeout: 20000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "account-signed-email"
+    commands:
+      - takeScreenshot: ${OUT}-acc-03-error
+      # Fail the flow here (the e-mail line is not on screen).
+      - assertVisible:
+          id: "account-signed-email"
+- takeScreenshot: ${OUT}-acc-03-signed-in
+
+# Back to Settings: the account row now shows the e-mail. Reopen the account screen.
+- tapOn: "Geri|Back"
+- extendedWaitUntil:
+    visible:
+      id: "settings-account"
+    timeout: 20000
+# The row label is "Hesap, <value>": match the e-mail inside it (the + is a regex character).
+- assertVisible: ".*qa.*@example.com.*"
+- takeScreenshot: ${OUT}-acc-04-settings
+- tapOn:
+    id: "settings-account"
+- extendedWaitUntil:
+    visible:
+      id: "account-screen"
+    timeout: 20000
+
+# Sign out.
+- tapOn:
+    id: "account-signout"
+- extendedWaitUntil:
+    visible:
+      id: "account-status"
+    timeout: 20000
+- assertVisible: "Çıkış yaptın.*|You signed out.*|Signed out.*"
+- takeScreenshot: ${OUT}-acc-05-signed-out
+
+# Sign in again.
+- tapOn:
+    id: "account-mode-signin"
+- tapOn:
+    id: "account-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "account-password"
+- inputText: ${PW}
+- tapOn:
+    point: "50%, 12%"
+    optional: true
+- tapOn:
+    id: "account-submit"
+- extendedWaitUntil:
+    visible:
+      id: "account-signed-email"
+    timeout: 20000
+- takeScreenshot: ${OUT}-acc-06-signed-in-again
+
+# Delete the account.
+- tapOn:
+    id: "account-delete"
+- tapOn:
+    id: "account-delete-continue"
+- tapOn:
+    id: "account-delete-password"
+- inputText: ${PW}
+- tapOn:
+    point: "50%, 12%"
+    optional: true
+- tapOn:
+    id: "account-delete-confirm"
+- extendedWaitUntil:
+    visible:
+      id: "account-status"
+    timeout: 20000
+- assertVisible: "Hesabın silindi.*|Your account was deleted.*|Account deleted.*"
+- takeScreenshot: ${OUT}-acc-07-deleted
+
+# Proof of deletion: the same credentials must now be refused.
+- tapOn:
+    id: "account-mode-signin"
+    optional: true
+- tapOn:
+    id: "account-email"
+- inputText: ${EMAIL}
+- tapOn:
+    id: "account-password"
+- inputText: ${PW}
+- tapOn:
+    point: "50%, 12%"
+    optional: true
+- tapOn:
+    id: "account-submit"
+- extendedWaitUntil:
+    visible:
+      id: "account-password-error"
+    timeout: 20000
+- assertVisible: "E-posta ya da şifre yanlış.*|Email or password is wrong.*"
+- takeScreenshot: ${OUT}-acc-08-wrong
+
+# Cheap local check, no network: an invalid e-mail and "forgot password".
+- tapOn:
+    id: "account-email"
+- eraseText: 80
+- inputText: "abc"
+- tapOn:
+    point: "50%, 12%"
+    optional: true
+- tapOn:
+    id: "account-forgot"
+- extendedWaitUntil:
+    visible:
+      id: "account-email-error"
+    timeout: 10000
+- takeScreenshot: ${OUT}-acc-09-invalid-email

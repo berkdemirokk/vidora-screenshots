@@ -1,0 +1,64 @@
+# QA flow "paywall" (independent): the not-subscribed demo state (screenshot
+# builds) top, plans, end, and the failed state (vidora://paywall?qa=failed).
+# iOS asks '"Vidora" ile Açılsın mı?' for the custom-scheme link: tap Aç.
+#   maestro test -e OUT=qa apps/mobile/.maestro/qa-paywall.yaml
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- openLink: "vidora://paywall"
+- tapOn:
+    text: "Aç|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "paywall-close"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "proof-ready"
+    timeout: 20000
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+# Screenshot builds give the demo plans a 3-day trial: the note and the
+# cancel link must be visible. The proof frame only shows after a render.
+- assertVisible:
+    id: "paywall-trial-note"
+- assertVisible:
+    id: "paywall-cancel-guide"
+- takeScreenshot: ${OUT}/28-paywall-top
+- scroll
+- assertVisible:
+    id: "paywall-plan-year"
+- takeScreenshot: ${OUT}/29-paywall-plans
+- scroll
+- scroll
+- assertVisible:
+    id: "paywall-restore"
+- takeScreenshot: ${OUT}/30-paywall-end
+- tapOn:
+    id: "paywall-close"
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 10000
+
+# Failed state.
+- openLink: "vidora://paywall?qa=failed"
+- tapOn:
+    text: "Aç|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "paywall-close"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/31-paywall-failed
+- tapOn:
+    id: "paywall-close"

@@ -1,0 +1,100 @@
+# QA flow "start" (Turkish): fresh install → Home (empty, intent tiles) →
+# editor via the intent-discount tile → cut-out and first playing preview
+# (hard 60 s) → every tool panel → all texts → Format. Ends in the editor
+# with no panel open; the workflow then records 10 s of the preview.
+# Elements are found by testID; every navigation asserts where it landed.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+# The "Fotoğrafın → Videon" proof pair draws first.
+- extendedWaitUntil:
+    visible:
+      id: "proof-ready"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/01-home-empty
+- assertVisible:
+    id: "intent-discount"
+- scroll
+- takeScreenshot: ${OUT}/01b-home-empty-intents
+
+# Enter through the "İndirim duyurusu" intent: İndirim template, 1:1.
+- tapOn:
+    id: "intent-discount"
+- extendedWaitUntil:
+    visible:
+      id: "sample-product"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/02-editor-start
+
+- tapOn:
+    id: "sample-product"
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 120000
+- takeScreenshot: ${OUT}/03-cutout-early
+# The intent preselects the İndirim template (Şablon is open by default,
+# in Görünümler mode; the templates are in "Şablonlar" mode).
+- takeScreenshot: ${OUT}/03a-sablon-looks-mode
+- tapOn:
+    id: "template-mode-templates"
+- assertVisible:
+    id: "template-discount"
+    selected: true
+- takeScreenshot: ${OUT}/03b-intent-discount-template
+# The first playing preview must start within 60 s of the cut-out; a stuck
+# preview is an app bug, so stop here with evidence (Maestro saves a
+# screenshot of the failing step; this one shows the state just before).
+- takeScreenshot: ${OUT}/03c-waiting-for-preview
+- extendedWaitUntil:
+    visible: "Video önizlemesi|Video preview"
+    timeout: 60000
+- extendedWaitUntil:
+    notVisible: "Önizleme hazırlanıyor|Preparing the preview"
+    timeout: 120000
+    optional: true
+- takeScreenshot: ${OUT}/04-cutout-preview
+
+# Tool panels (the looks row in Şablon is covered by qa-looks.yaml).
+- takeScreenshot: ${OUT}/05-panel-sablon
+- tapOn:
+    id: "tool-background"
+- assertVisible:
+    id: "backdrop-marble-white"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/06-panel-arkaplan
+
+# Metin: field tabs, all texts filled and asserted.
+- runFlow:
+    file: qa-texts.yaml
+    env:
+      SHOT: "1"
+
+- tapOn:
+    id: "tool-music"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/09-panel-muzik
+- tapOn:
+    id: "tool-format"
+- assertVisible:
+    id: "ratio-1x1"
+    selected: true
+- waitForAnimationToEnd:
+    timeout: 3000
+# Pazaryeri is the default destination; with price and badge filled the
+# Trendyol hint should show here.
+- takeScreenshot: ${OUT}/10-panel-format
+# Leave the editor with no panel open for the preview recording.
+- tapOn:
+    id: "tool-format"

@@ -1,0 +1,26 @@
+# QA helper: from a result or the editor back to Home, asserted.
+# Result: result-bar-done ("Bitti") leaves the editor. Editor: editor-back saves
+# the draft and goes Home (no confirmation unless a render is running).
+appId: com.berkdemirok.vidora
+---
+- runFlow:
+    when:
+      visible:
+        id: "result-bar-done"
+    commands:
+      - tapOn:
+          id: "result-bar-done"
+- runFlow:
+    when:
+      visible:
+        id: "editor-back"
+    commands:
+      - tapOn:
+          id: "editor-back"
+- tapOn:
+    text: "Çık|Leave"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 15000

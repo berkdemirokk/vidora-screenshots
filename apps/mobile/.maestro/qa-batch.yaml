@@ -1,0 +1,22 @@
+# Batch + Export all on the bundled sample (no photo picker). Needs a
+# screenshot/QA build (batch-add-sample is hidden otherwise).
+appId: com.berkdemirok.vidora
+env:
+  OUT: qa-batch
+---
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "library-batch"
+    optional: true
+- openLink: "vidora:///batch"
+- tapOn:
+    id: "batch-add-sample"
+- assertVisible:
+    id: "batch-item-1"
+- tapOn:
+    id: "batch-start"
+- extendedWaitUntil:
+    visible: ".*1/1.*"
+    timeout: 900000
+- takeScreenshot: ${OUT}-done

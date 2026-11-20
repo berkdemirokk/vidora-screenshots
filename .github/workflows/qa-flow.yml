@@ -1,0 +1,521 @@
+# Fast verification loop: ONE flow (real photo -> editor -> 2 texts -> render ->
+# result -> save). The native build (.app) is cached on a hash of the native
+# inputs; when they are unchanged only the JS bundle is re-embedded.
+# Uploads: sheet (sheet.png), qa-video (newest MP4), qa-cutout (cut-out PNG),
+# and on failure: qa-fail (final.png, Maestro debug, last 80 app log lines).
+name: Simulator QA flow
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_native:
+        description: "Force a full native build (ignore the cache)"
+        type: boolean
+        default: false
+      device:
+        description: "Simulator device: iphone (iPhone Pro Max, default) or ipad (newest iPad; the iPhone-only app runs in compatibility mode)"
+        type: choice
+        options:
+          - iphone
+          - ipad
+        default: iphone
+      template:
+        description: "Template for the poster: campaign (default), discount (also fills the old price) or showcase"
+        type: choice
+        options:
+          - campaign
+          - discount
+          - showcase
+        default: campaign
+      device_name:
+        description: "Small-screen check: simulator device type NAME for the iPhone, e.g. iPhone SE (3rd generation); empty = default"
+        type: string
+        default: ""
+      qa_quality:
+        description: "QA only: force the render quality at bundle time (720p or 1080p); empty = the app default (Pro: 1080p)"
+        type: choice
+        options:
+          - ""
+          - 720p
+          - 1080p
+        default: ""
+      qa_recipe:
+        description: "QA only: 1 = render the multi-scene Yeni Koleksiyon recipe instead of the template"
+        type: choice
+        options:
+          - ""
+          - "1"
+        default: ""
+
+jobs:
+  flow:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_SCREENSHOT_MODE: "1"
+      EXPO_PUBLIC_QA_DIAG: "1"   # Home shows a tiny poster-diag element; never in store-screens.yml
+      EXPO_PUBLIC_ACCOUNTS: "1"   # optional e-mail accounts are on in production; QA tests what ships
+      EXPO_PUBLIC_QA_QUALITY: ${{ inputs.qa_quality }}
+      EXPO_PUBLIC_QA_RECIPE: ${{ inputs.qa_recipe }}
+      CI: "1"
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
+      MAESTRO_CLI_NO_ANALYTICS: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          echo "XCODE_ID=$(basename "$XCODE" .app)" >> "$GITHUB_ENV"
+
+      - name: Compute native cache key
+        run: echo "NATIVE_KEY=vidora-native-$XCODE_ID-${{ hashFiles('package-lock.json', 'apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/modules/**', 'apps/mobile/plugins/**') }}" >> "$GITHUB_ENV"
+
+      - name: Restore native build cache
+        id: cache
+        if: ${{ !inputs.force_native }}
+        uses: actions/cache/restore@v4
+        with:
+          path: apps/mobile/ios
+          key: ${{ env.NATIVE_KEY }}
+
+      - name: Plan
+        id: plan
+        run: |
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ] && [ "${{ inputs.force_native }}" != "true" ]; then
+            echo "full=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install JS dependencies
+        run: npm install --no-audit --no-fund
+
+      # Optional: if the repository secret FIREBASE_WEB_API_KEY exists, put the real Firebase web key
+      # into the bundle (the public clone only carries the placeholder). It is masked and never
+      # echoed. Without the secret this step does nothing.
+      - name: Patch the Firebase web key (only if the secret exists)
+        env:
+          FIREBASE_KEY: ${{ secrets.FIREBASE_WEB_API_KEY }}
+        run: |
+          if [ -n "$FIREBASE_KEY" ]; then
+            echo "::add-mask::$FIREBASE_KEY"
+            sed -i.bak "s|REDACTED-FOR-PUBLIC-REPO|$FIREBASE_KEY|" apps/mobile/src/auth/config.ts
+            rm -f apps/mobile/src/auth/config.ts.bak
+            echo "Firebase web key patched into the bundle (value not shown)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # The cached app's bundle is Hermes bytecode, which a plain `expo export:embed`
+      # cannot reproduce (run 19: header mismatch), so the swap is gone. Instead
+      # apps/mobile/ios (Pods + DerivedData in ios/build) is cached: on a hit the
+      # prebuild is skipped and xcodebuild only rebuilds what changed (the JS bundle).
+      - name: Prebuild iOS project
+        if: steps.plan.outputs.full == 'true'
+        working-directory: apps/mobile
+        run: |
+          echo "**NATIVE CHANGED - full build**" >> "$GITHUB_STEP_SUMMARY"
+          npx expo prebuild --platform ios --no-install --clean
+          cd ios && pod install
+
+      - name: Note cached build
+        if: steps.plan.outputs.full == 'false'
+        run: |
+          echo "**CACHED - incremental build (Pods + DerivedData restored)**" >> "$GITHUB_STEP_SUMMARY"
+          # The restored ios/.xcode.env.local names the previous run's node (run 21: node 24.22.3
+          # was gone); point it at this runner's node.
+          echo "export NODE_BINARY=$(command -v node)" > apps/mobile/ios/.xcode.env.local
+
+      - name: Build for the simulator
+        id: build
+        timeout-minutes: 45
+        working-directory: apps/mobile/ios
+        run: |
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          set -o pipefail
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO 2>&1 \
+            | tee "$GITHUB_WORKSPACE/xcodebuild.log" \
+            | grep -E "error:|warning: .*Karevia|BUILD (SUCCEEDED|FAILED)|\*\* " || true
+          grep -q "BUILD SUCCEEDED" "$GITHUB_WORKSPACE/xcodebuild.log"
+          APP=$(find build/Build/Products -maxdepth 2 -name "*.app" -type d | head -1)
+          echo "APP_PATH=$PWD/$APP" >> "$GITHUB_ENV"
+
+      - name: Save native build cache
+        if: steps.build.outcome == 'success' && steps.plan.outputs.full == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: apps/mobile/ios
+          key: ${{ env.NATIVE_KEY }}
+
+      - name: Summarise build errors
+        if: failure() && steps.build.outcome == 'failure'
+        run: |
+          {
+            echo "## FAILED AT: Build for the simulator"
+            echo '```'
+            grep -E "error:" xcodebuild.log | sort -u | head -80 || echo "(no error: lines; see build-log artifact)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: failure() && steps.build.outcome == 'failure'
+        with:
+          name: build-log
+          path: xcodebuild.log
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Create simulator (Turkish, light)
+        run: |
+          if [ "${{ inputs.device }}" = "ipad" ]; then
+            # Newest available iPad (App Review may open the iPhone-only app on an iPad).
+            TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPad-[A-Za-z0-9-]*" | sort -uV | tail -1)
+            echo "iPad device type: $TYPE" >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "${{ inputs.device_name }}" ]; then
+            # A named small iPhone; falls back to the smallest of the newer small models.
+            TYPE=$(xcrun simctl list devicetypes | grep -F "${{ inputs.device_name }} (" | grep -o "com.apple.CoreSimulator.SimDeviceType.[A-Za-z0-9-]*" | head -1)
+            [ -z "$TYPE" ] && TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation" | head -1)
+            [ -z "$TYPE" ] && TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-17e" | head -1)
+            [ -z "$TYPE" ] && TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-16e" | head -1)
+            echo "Small iPhone device type: ${TYPE:-NONE FOUND} (requested: ${{ inputs.device_name }})" >> "$GITHUB_STEP_SUMMARY"
+            xcrun simctl list devicetypes | grep -i "iphone" >> "$GITHUB_STEP_SUMMARY" || true
+          else
+            TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max" | head -1)
+            [ -z "$TYPE" ] && TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro-Max" | head -1)
+          fi
+          RUNTIME=$(xcrun simctl list runtimes | grep -o "com.apple.CoreSimulator.SimRuntime.iOS-[0-9-]*" | sort -V | tail -1)
+          UDID=$(xcrun simctl create "QA" "$TYPE" "$RUNTIME")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl spawn "$UDID" defaults write -g AppleLanguages -array tr
+          xcrun simctl spawn "$UDID" defaults write -g AppleLocale -string tr_TR
+          xcrun simctl shutdown "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance light
+          xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi \
+            --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 \
+            --batteryState charged --batteryLevel 100
+          xcrun simctl install "$UDID" "$APP_PATH"
+          xcrun simctl privacy "$UDID" grant photos-add com.berkdemirok.vidora || true
+          xcrun simctl privacy "$UDID" grant photos com.berkdemirok.vidora || true
+          maestro --device "$UDID" hierarchy > /dev/null 2>&1 || true
+
+      - name: Add test photos (fixtures)
+        run: |
+          shopt -s nullglob
+          FILES=(apps/mobile/.maestro/fixtures/*.jpg)
+          if [ ${#FILES[@]} -gt 0 ]; then
+            echo "Adding ${#FILES[@]} fixture photo(s)"
+            xcrun simctl addmedia "$UDID" "${FILES[@]}"
+          else
+            echo "No fixtures; using the simulator's default photos"
+          fi
+
+      - name: Record Photos baseline
+        run: |
+          DCIM="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Media/DCIM"
+          find "$DCIM" -type f 2>/dev/null | sort > "$RUNNER_TEMP/dcim-before.txt" || true
+
+      - name: Run the flow
+        id: flow
+        timeout-minutes: 20
+        run: |
+          mkdir -p diag shots
+          if [ "${{ inputs.device }}" = "ipad" ]; then
+            # Maestro cannot see the windowed iPhone-compatibility app on iPadOS: launch it,
+            # wait 20 s, take one Home screenshot with simctl and finish green.
+            xcrun simctl launch "$UDID" com.berkdemirok.vidora | tee diag/maestro.out
+            sleep 20
+            xcrun simctl io "$UDID" screenshot shots/ipad-home.png
+            exit 0
+          fi
+          set +e
+          maestro --device "$UDID" test -e OUT=qa -e TEMPLATE="${{ inputs.template || 'campaign' }}" \
+            -e ENTRY="${{ inputs.device_name == '' && 'sample' || 'picker' }}" \
+            --test-output-dir "$GITHUB_WORKSPACE/shots" \
+            --debug-output "$GITHUB_WORKSPACE/diag/maestro" \
+            apps/mobile/.maestro/qa-flow.yaml < /dev/null 2>&1 | tee diag/maestro.out
+          RC=${PIPESTATUS[0]}
+          exit $RC
+
+      # Extra screens (Library, Settings, paywall); never fails the job.
+      - name: Run the extra screens flow
+        id: extra
+        if: always() && inputs.device != 'ipad'
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          mkdir -p diag shots
+          set +e
+          maestro --device "$UDID" test -e OUT=qa             --test-output-dir "$GITHUB_WORKSPACE/shots"             --debug-output "$GITHUB_WORKSPACE/diag/maestro-extra"             apps/mobile/.maestro/qa-extra.yaml < /dev/null 2>&1 | tee diag/maestro-extra.out
+          exit 0
+
+      # Small-screen job (device_name set): only the account screens up to the password keyboard.
+      - name: Small-screen account screens
+        if: always() && inputs.device_name != ''
+        continue-on-error: true
+        timeout-minutes: 6
+        run: |
+          mkdir -p shots/account-small
+          maestro --device "$UDID" test -e OUT=qa             --test-output-dir "$GITHUB_WORKSPACE/shots/account-small"             apps/mobile/.maestro/qa-account-small.yaml < /dev/null > diag/maestro-account-small.out 2>&1 || true
+          exit 0
+
+      # Optional e-mail accounts against the real (free) Firebase project; needs network. The e-mail
+      # and password are generated here, the password is masked in the log and never printed.
+      - name: Run the account flow
+        id: account
+        if: always() && inputs.device != 'ipad' && inputs.qa_quality == '' && inputs.device_name == '' && (inputs.template == 'campaign' || inputs.template == '')
+        continue-on-error: true
+        timeout-minutes: 12
+        env:
+          FIREBASE_KEY_SET: ${{ secrets.FIREBASE_WEB_API_KEY != '' }}
+        run: |
+          # Raw Maestro output (commands, logs, xctest) stays in RUNNER_TEMP and is NEVER uploaded:
+          # it contains the typed password. Only the screenshots and a copy with the password
+          # replaced by *** are put into the uploaded folders.
+          RAW="$RUNNER_TEMP/acct"
+          rm -rf "$RAW"; mkdir -p "$RAW" shots/account diag/account-sanitized
+          EMAIL="qa+$(python3 -c 'import time;print(int(time.time()*1000))')@example.com"
+          PW=$(python3 -c 'import secrets,string;print("".join(secrets.choice(string.ascii_letters+string.digits) for _ in range(16)))')
+          echo "::add-mask::$PW"
+          set +e
+          maestro --device "$UDID" test -e OUT=qa -e EMAIL="$EMAIL" -e PW="$PW"             --test-output-dir "$RAW/out" --debug-output "$RAW/debug"             apps/mobile/.maestro/qa-account.yaml < /dev/null > "$RAW/stdout.txt" 2>&1
+          RC=$?
+          CRC=skipped
+          if [ $RC -ne 0 ] && [ "$FIREBASE_KEY_SET" = "true" ]; then
+            maestro --device "$UDID" test -e OUT=qa -e EMAIL="$EMAIL" -e PW="$PW"               --test-output-dir "$RAW/cleanup-out" --debug-output "$RAW/cleanup-debug"               apps/mobile/.maestro/qa-account-cleanup.yaml < /dev/null > "$RAW/cleanup-stdout.txt" 2>&1
+            CRC=$?
+          fi
+          # Uploadable: screenshots only, plus sanitized text copies (password replaced by ***).
+          find "$RAW" -name '*.png' -exec cp {} shots/account/ \; 2>/dev/null
+          for f in "$RAW/stdout.txt" "$RAW/cleanup-stdout.txt"; do
+            [ -f "$f" ] && sed "s|$PW|***|g" "$f" > "diag/account-sanitized/$(basename "$f")"
+          done
+          for f in $(find "$RAW" -name commands.json -o -name maestro.log); do
+            sed "s|$PW|***|g" "$f" > "diag/account-sanitized/$(echo "$f" | tr '/' '_')"
+          done
+          if [ $RC -eq 0 ]; then
+            echo "Account flow: PASSED (e-mail $EMAIL)" | tee -a shots/qa-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$FIREBASE_KEY_SET" != "true" ]; then
+            echo "Account flow: EXPECTED FAIL (redacted key); no cleanup was run (no sign-up can have succeeded)" | tee -a shots/qa-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Account flow: FAILED (e-mail $EMAIL); cleanup flow exit code: $CRC (0 = ran; a leftover user may remain if it did not delete it)" | tee -a shots/qa-summary.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
+
+      - name: Collect result media
+        if: always()
+        run: |
+          mkdir -p out/cutout
+          DCIM="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Media/DCIM"
+          MP4=$(find "$DCIM" -type f \( -iname "*.mp4" -o -iname "*.mov" \) -print0 2>/dev/null | xargs -0 ls -t 2>/dev/null | head -1)
+          if [ -n "$MP4" ]; then cp "$MP4" out/result.mp4; else echo "no video in Photos"; fi
+          DATA=$(xcrun simctl get_app_container "$UDID" com.berkdemirok.vidora data 2>/dev/null) || DATA=""
+          for dir in Library/Caches tmp Documents; do
+            if [ -n "$DATA" ] && [ -d "$DATA/$dir" ]; then
+              find "$DATA/$dir" -name "vidora-cutout-*.png" -exec cp {} out/cutout/ \; 2>/dev/null || true
+            fi
+          done
+          ls -la out out/cutout || true
+
+      - name: Build the 3-image sheet
+        if: always() && inputs.device != 'ipad'
+        run: |
+          command -v ffmpeg >/dev/null || brew install ffmpeg >/dev/null
+          ED=$(find shots -name "qa-editor.png" | head -1)
+          RS=$(find shots -name "*result*.png" | head -1)
+          SV=$(find shots -name "*saved*.png" | head -1)
+          INPUTS=(); N=0
+          for f in "$ED" "$RS" "$SV"; do
+            if [ -n "$f" ]; then INPUTS+=(-i "$f"); N=$((N+1)); fi
+          done
+          if [ -f out/result.mp4 ]; then
+            DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 out/result.mp4)
+            for p in 0.2 0.5 0.9; do
+              T=$(awk -v d="$DUR" -v p="$p" 'BEGIN{printf "%.2f", d*p}')
+              ffmpeg -loglevel error -y -ss "$T" -i out/result.mp4 -frames:v 1 "out/frame-$p.png" || true
+              if [ -f "out/frame-$p.png" ]; then INPUTS+=(-i "out/frame-$p.png"); N=$((N+1)); fi
+            done
+          fi
+          if [ "$N" -gt 0 ]; then
+            FILTER=""; LABELS=""
+            for i in $(seq 0 $((N-1))); do
+              FILTER="${FILTER}[$i:v]scale=-2:900[s$i];"; LABELS="${LABELS}[s$i]"
+            done
+            ffmpeg -loglevel error -y "${INPUTS[@]}" \
+              -filter_complex "${FILTER}${LABELS}hstack=inputs=$N" sheet.png
+          fi
+          ls -la sheet.png || echo "no sheet"
+
+      - name: Summary and failure bundle
+        if: always()
+        run: |
+          mkdir -p diag shots
+          QS=shots/qa-summary.txt
+          touch "$QS"
+          xcrun simctl io "$UDID" screenshot diag/final.png || true
+          # Poster diagnostic text on Home (QA-only element poster-diag), read from the screen hierarchy.
+          PD=$(maestro --device "$UDID" hierarchy 2>/dev/null | grep -o 'poster:[A-Za-z]*:[^"]*' | head -1 | cut -c1-200)
+          echo "Poster diag (Home): ${PD:-(none: Home not on screen or no QA diag)}" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          # Welcome line: which tap removed it (id / text / none)?
+          WL=$(find shots -name 'qa-library-welcome.png' 2>/dev/null | head -1)
+          if [ -z "$WL" ]; then WRES="no welcome line was shown"
+          elif ! find shots -name 'qa-library-after-dismiss-text.png' 2>/dev/null | grep -q .; then WRES="id tap removed it"
+          elif find shots -name 'qa-library.png' 2>/dev/null | grep -q .; then WRES="the text tap (Kapat) removed it; the id tap did NOT"
+          else WRES="NONE: neither the id tap nor the text tap removed it"; fi
+          echo "Welcome line dismissal: $WRES" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          case "$WRES" in NONE*) WELCOME_FAIL=1;; esac
+          if [ -n "${{ inputs.device_name }}" ]; then
+            PX=$(sips -g pixelWidth -g pixelHeight diag/final.png 2>/dev/null | awk '/pixel/{printf "%s ", $2}')
+            DEVLINE=$(xcrun simctl list devices | grep -F "$UDID" | head -1 | sed 's/^ *//' | cut -c1-90)
+            echo "Small-screen device: $DEVLINE; screenshot pixels (w h): $PX" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # Filtered device log for the whole flow (capped at about 4000 lines).
+          xcrun simctl spawn "$UDID" log show --last 90m --info --debug --style compact --predicate 'process == "Vidora" AND (eventMessage CONTAINS "[vidora]" OR eventMessage CONTAINS "Vidora" OR eventMessage CONTAINS "render")' 2>/dev/null | cut -c1-400 | head -n 4000 > diag/app-filtered.log || true
+          # Crash detection: Maestro output, Maestro crash reports and iOS crash reports for Vidora.
+          CRASH=0
+          mkdir -p diag/crash
+          if grep -qE "App crashed|The app is not running" diag/maestro.out 2>/dev/null; then CRASH=1; fi
+          for f in $(find shots -name 'crash-report*' 2>/dev/null); do cp "$f" "diag/crash/$(basename "$f")"; CRASH=1; done
+          for f in $(find "$HOME/Library/Logs/DiagnosticReports" -name 'Vidora*' 2>/dev/null); do cp "$f" diag/crash/; CRASH=1; done
+          if [ "$CRASH" = "1" ]; then
+            CR=$(ls diag/crash/* 2>/dev/null | head -1)
+            {
+              echo "## CRASH: the app crashed during the flow (it did not hang or time out; a failed assert after this is a consequence)"
+              echo '```'
+              if [ -n "$CR" ]; then
+                grep -m3 -E "Exception Type|Exception Codes|Termination Reason" "$CR"
+                awk '/Crashed:|Thread 0/{f=1} f{print; n++} n>=9{exit}' "$CR" | cut -c1-200
+              else
+                echo "(no crash report file found; see diag/maestro.out)"
+              fi
+              echo '```'
+            } | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # The template tile must really have been chosen for discount/showcase (run 23: it was not).
+          # Template tap and the app's own press logs ([vidora] template: / welcome:).
+          # Name field focus after each tap (from the hierarchy dumps of the warned "dump" waits).
+          for TAPN in tap1 tap2 second; do
+            HF=$(find shots -name "step-*qa_dump_name_${TAPN}*.json" 2>/dev/null | head -1)
+            if [ -n "$HF" ]; then python3 apps/mobile/.maestro/hier_probe.py "$HF" "$TAPN" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"; fi
+          done
+          TT=n/a
+          if [ -n "${{ inputs.template }}" ] && [ "${{ inputs.template }}" != "campaign" ] && [ "${{ inputs.device }}" != "ipad" ]; then
+            if ! find shots -name 'qa-template.png' 2>/dev/null | grep -q .; then TT=NONE
+            elif ! find shots -name 'qa-template-text.png' 2>/dev/null | grep -q .; then TT="id (the id tap selected the tile)"
+            elif find shots -name 'qa-editor.png' 2>/dev/null | grep -q .; then TT="text (the id tap did NOT select it; the text tap did)"
+            else TT=NONE; fi
+          fi
+          echo "Template tap: $TT" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          { echo "App press logs:"; grep -hE "\[vidora\] (template|welcome|fields?|kb):" diag/app-filtered.log 2>/dev/null | cut -c1-240 | head -150; } | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          case "$TT" in NONE*) echo "## TEMPLATE TAP: NONE" >> "$GITHUB_STEP_SUMMARY"; SUMMARY_FAIL=1;; esac
+          TPL="${{ inputs.template }}"
+          if [ -n "$TPL" ] && [ "$TPL" != "campaign" ] && [ "${{ inputs.device }}" != "ipad" ]; then
+            if find shots -name 'qa-template.png' 2>/dev/null | grep -q .; then
+              echo "Template $TPL: chosen (qa-template screenshot exists)" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "## TEMPLATE NOT APPLIED: $TPL was requested but the flow never tapped its tile (no qa-template screenshot)" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+              SUMMARY_FAIL=1
+            fi
+          fi
+          if [ "${WELCOME_FAIL:-0}" = "1" ]; then echo "## WELCOME LINE NOT DISMISSED by id or text" >> "$GITHUB_STEP_SUMMARY"; SUMMARY_FAIL=1; fi
+          # Render timeline from the QA-only render-diag element (printed by the flow each poll).
+          RD=$(grep -h "RENDERDIAG" diag/maestro.out 2>/dev/null | tail -1 | cut -c1-300)
+          RT=$(grep -ho "render:done t=[0-9]*s" diag/maestro.out 2>/dev/null | tail -1)
+          echo "Last render-diag: ${RD:-(none recorded)}" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          echo "Render time: ${RT:-(render did not finish)}" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          xcrun simctl spawn "$UDID" log show --last 40m --info --debug --style compact \
+            --predicate 'process == "Vidora" OR subsystem CONTAINS "vidora"' 2>/dev/null | tail -n 80 > diag/app-last80.log || true
+          # Proof that saving to Photos worked: newest mp4/mov that was not in DCIM before the flow.
+          DCIM="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Media/DCIM"
+          find "$DCIM" -type f \( -iname "*.mp4" -o -iname "*.mov" \) 2>/dev/null | sort > "$RUNNER_TEMP/dcim-after.txt" || true
+          SAVED=$(comm -13 "$RUNNER_TEMP/dcim-before.txt" "$RUNNER_TEMP/dcim-after.txt" 2>/dev/null | tr '\n' '\0' | xargs -0 ls -t 2>/dev/null | head -1)
+          if [ -n "$SAVED" ]; then
+            echo "Photos video: $SAVED ($(stat -f %z "$SAVED") bytes)" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "NO NEW VIDEO IN PHOTOS" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # How the keyboard was closed in the editor: Bitti bar, Return chain or a tap on the preview.
+          KB=$(find "$GITHUB_WORKSPACE" -maxdepth 7 -name '*kb-closed-*.png' -not -path '*/node_modules/*' 2>/dev/null | sed 's/.*kb-closed-//;s/\.png$//' | sort -u | paste -sd ' ' -)
+          echo "Keyboard closed by: ${KB:-(none recorded)}" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          # How many times home-create was tapped in the main flow: executed "Tap on ... home-create"
+          # lines of the Maestro console output (commands.json is only written for failed runs).
+          HC=$(grep -E "Tap on.*home-create" diag/maestro.out 2>/dev/null | grep -vE "FAILED|❌" | wc -l | tr -d ' ')
+          echo "home-create taps: $HC" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.flow.outcome }}" != "success" ]; then
+            STEP=$(grep -m1 -E "FAILED|Failed|❌" diag/maestro.out 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | head -c 200)
+            if [ -z "$STEP" ]; then STEP="(see diag/maestro.out; flow outcome ${{ steps.flow.outcome }})"; fi
+            { echo "## FAILED AT: $STEP"; echo; echo '```'; tail -n 15 diag/app-last80.log; echo '```'; } | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Flow PASSED, template ${{ inputs.template || 'campaign' }} (artifact: sheet-${{ inputs.template || 'campaign' }})" | tee -a "$QS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # Fail only now, after every summary line has been written.
+          if [ "${SUMMARY_FAIL:-0}" = "1" ]; then exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crash-${{ inputs.template || 'campaign' }}
+          path: |
+            diag/crash
+            diag/app-filtered.log
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sheet-${{ inputs.template || 'campaign' }}
+          path: sheet.png
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-screens-${{ inputs.template || 'campaign' }}
+          path: |
+            shots/**/*.png
+            shots/qa-summary.txt
+            shots/**/commands.json
+            shots/**/screen-hierarchy/*.json
+            !**/device-simulator.log
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-video-${{ inputs.template || 'campaign' }}
+          path: out/result.mp4
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-cutout-${{ inputs.template || 'campaign' }}
+          path: out/cutout
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: qa-fail-${{ inputs.template || 'campaign' }}
+          path: |
+            diag
+            shots
+            !**/device-simulator.log
+          if-no-files-found: warn

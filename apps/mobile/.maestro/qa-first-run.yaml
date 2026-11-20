@@ -1,0 +1,20 @@
+# QA flow "first-run": the fast path. A new user taps "Örnekle dene" on Home
+# and lands in the editor on the bundled sample, no system photo picker.
+#   maestro test -e OUT=qa apps/mobile/.maestro/qa-first-run.yaml
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "sample-try"
+    timeout: 60000
+- takeScreenshot: ${OUT}/40-first-run-home
+- tapOn:
+    id: "sample-try"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 120000
+- takeScreenshot: ${OUT}/41-first-run-editor

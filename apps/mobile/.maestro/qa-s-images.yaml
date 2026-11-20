@@ -1,0 +1,33 @@
+# Short QA run: the image set with three backdrops. The sheet opens with
+# five preselected; two are switched off. Starts from a new editor.
+appId: com.berkdemirok.vidora
+---
+- runFlow:
+    file: qa-s-prep.yaml
+- runFlow:
+    file: qa-s-texts.yaml
+- tapOn:
+    id: "tool-format"
+- tapOn:
+    id: "save-image"
+- tapOn: "Diğer zeminlerde de üret…|Make it on more backdrops…"
+- extendedWaitUntil:
+    visible:
+      id: "image-set-start"
+    timeout: 10000
+- tapOn:
+    id: "image-set-backdrop-walnut"
+    optional: true
+- tapOn:
+    id: "image-set-backdrop-linen"
+    optional: true
+- takeScreenshot: ${OUT}/image-set-three
+- tapOn:
+    id: "image-set-start"
+- tapOn:
+    text: "İzin Ver|Allow|Tam Erişime İzin Ver|Allow Full Access|Fotoğraf Ekle|Add Photos Only"
+    optional: true
+- extendedWaitUntil:
+    visible: ".*kaydedildi.*|.*saved.*"
+    timeout: 300000
+- takeScreenshot: ${OUT}/image-set-done

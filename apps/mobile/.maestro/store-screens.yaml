@@ -1,0 +1,306 @@
+# App Store raw shots (single-flow build): six clean screenshots (plus 07-templates) on the bundled sample.
+# Env (defaults here; the workflow passes the real ones per language): NAME, PRICE, LABEL, BUTTON.
+# Home "Fotoğraf seç" opens the photo source sheet over the start view: the flow cancels the
+# sheet ("Vazgeç|Cancel") to shoot the viewfinder. Optional 07-templates: the Şablon panel.
+# Order: Home -> Start view (viewfinder) -> relaunch -> "Örnekle dene" -> editor (Metin) ->
+# Arka plan -> render -> result -> save -> Library. Selectors were checked in the source:
+# home-hero/home-create/home-sample (app/(tabs)/(studio)/index.tsx), pick-photo (start-view.tsx),
+# tool-background/tool-text/render-button (app/create.tsx), field-* (src/studio/panels.tsx),
+# backdrop-travertine (src/backdrops.ts), save-photos/result-bar-done (src/studio/result-view.tsx),
+# tab-library/library-segment (app/(tabs)). Texts without testID: "Bitti|Done" (keyboard bar),
+# "Kaydedildi|Saved" (save confirmation).
+appId: com.berkdemirok.vidora
+env:
+  NAME: "Lavanta Yağı"
+  PRICE: "349"
+  LABEL: "Yeni sezon"
+  BUTTON: "Hemen al"
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+# A first tap right after launch can be lost; settle first.
+- waitForAnimationToEnd:
+    timeout: 3000
+# 01-home: Home paints the sample photo first and cross-fades to the poster; this build has no
+# poster-diag element, so wait a fixed 10 s after Home appears (a never-visible text, optional).
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 10000
+    optional: true
+- takeScreenshot: 01-home
+
+# 02-start: the viewfinder start view. home-create opens the photo source sheet; retry a lost
+# first tap, then cancel the sheet.
+# Tap ONCE and give the app 8 s to show the photo source sheet. A blind retry would hit the new
+# screen's viewfinder (run 22: Maestro's own retry made one tap last 6.7 s, so the sheet was
+# requested twice). Re-tap only if the sheet is still missing AND Home (home-create) is still shown.
+- tapOn:
+    id: "home-create"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "Galeriden seç|Choose from library"
+    timeout: 8000
+    optional: true
+- repeat:
+    times: 2
+    while:
+      notVisible: "Galeriden seç|Choose from library"
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: "home-create"
+          commands:
+            - tapOn:
+                id: "home-create"
+                retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible: "Galeriden seç|Choose from library"
+          timeout: 8000
+          optional: true
+- tapOn:
+    text: "Vazgeç|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "pick-photo"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: 02-start
+
+# Back to Home by relaunching (clean state, no stacked screens), then the bundled sample.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-sample"
+    timeout: 60000
+- waitForAnimationToEnd:
+    timeout: 3000
+# Once pushed, Home is covered, so further taps no-op (the app also ignores a double tap within 1 s).
+# Tap "Örnekle dene" once and give the cut-out 30 s. Never re-tap while the start view is scanning
+# (Home is covered then, so home-sample is not visible): re-tap only if Home is still shown.
+- tapOn:
+    id: "home-sample"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 30000
+    optional: true
+- repeat:
+    times: 2
+    while:
+      notVisible:
+        id: "render-button"
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: "home-sample"
+          commands:
+            - tapOn:
+                id: "home-sample"
+                retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible:
+            id: "render-button"
+          timeout: 30000
+          optional: true
+# On-device cut-out finished: editor sheet with the render button.
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 180000
+- waitForAnimationToEnd:
+    timeout: 4000
+
+# Metin panel (default tool in the single flow): the fields are pre-filled with the sample copy
+# (equal to NAME/PRICE/LABEL/BUTTON), so nothing is typed: typing would append to the prefilled
+# text and Enter on the price field goes to the old price, not the badge. Open the panel only.
+- tapOn:
+    id: "tool-text"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+# Close the keyboard (the ink bar's "Bitti"); the render button only returns once it is gone.
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        id: "render-button"
+    commands:
+      - tapOn:
+          text: "Bitti|Done"
+          optional: true
+      - waitForAnimationToEnd:
+          timeout: 3000
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 5000
+# 03-editor: texts filled, Metin panel, keyboard closed. A fixed 6 s wait so the preview is past
+# its first second (title, price and button text on screen), then the shot.
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 6000
+    optional: true
+- takeScreenshot: 03-editor
+
+# 04-editor-background: Arka plan tool with the bundled studio backdrops.
+- tapOn:
+    id: "tool-background"
+- extendedWaitUntil:
+    visible:
+      id: "backdrop-travertine"
+    timeout: 15000
+- tapOn:
+    id: "backdrop-travertine"
+- waitForAnimationToEnd:
+    timeout: 6000
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 6000
+    optional: true
+- takeScreenshot: 04-editor-background
+# The preview loops (about 9 s) and its phase is not known here: three more candidates 2.2 s
+# apart cover the loop; the one showing title, price and button is chosen when composing.
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2200
+    optional: true
+- takeScreenshot: 04-editor-background-b
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2200
+    optional: true
+- takeScreenshot: 04-editor-background-c
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2200
+    optional: true
+- takeScreenshot: 04-editor-background-d
+
+# 07-templates (optional extra): the Şablon panel with the three templates, before rendering.
+- tapOn:
+    id: "tool-template"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "template-campaign"
+    timeout: 15000
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 6000
+- takeScreenshot: 07-templates
+
+# 05-result: render (long wait, simulator renders can exceed 5 min), shot before saving.
+- tapOn:
+    id: "render-button"
+- extendedWaitUntil:
+    visible:
+      id: "save-photos"
+    timeout: 900000
+- waitForAnimationToEnd:
+    timeout: 8000
+# The result player starts at its first second (only tag and bottle): wait about 6 s so the frame
+# shows the title, price and button text, then the shot.
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 6000
+    optional: true
+- takeScreenshot: 05-result
+# The preview loops (about 9 s) and its phase is not known here: three more candidates 2.2 s
+# apart cover the loop; the one showing title, price and button is chosen when composing.
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2200
+    optional: true
+- takeScreenshot: 05-result-b
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2200
+    optional: true
+- takeScreenshot: 05-result-c
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 2200
+    optional: true
+- takeScreenshot: 05-result-d
+
+# Save to Photos (so the video is a finished export), then Library.
+- tapOn:
+    id: "save-photos"
+- tapOn:
+    text: "İzin Ver|Allow|Tam Erişime İzin Ver|Allow Full Access|Fotoğraf Ekle|Add Photos Only"
+    optional: true
+- extendedWaitUntil:
+    visible: "Kaydedildi|Saved|Fotoğraflar'a kaydedildi|Saved to Photos"
+    timeout: 120000
+- tapOn:
+    id: "result-bar-done"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+# 06-library: the finished video in the Library tab (tab id first, label as a fallback).
+- tapOn:
+    id: "tab-library"
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "library-segment"
+    commands:
+      - tapOn:
+          text: "Kitaplık.*|Library.*"
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: "library-segment"
+    timeout: 20000
+# With accounts on, Library may show a one-time welcome line (account-welcome): wait up to 5 s for
+# it, dismiss it (not optional when shown) and check it is gone before the shot.
+- extendedWaitUntil:
+    visible:
+      id: "account-welcome"
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: "account-welcome"
+    commands:
+      - tapOn:
+          id: "account-welcome-dismiss"
+      - extendedWaitUntil:
+          visible: "__qa_fixed_wait_never_present__"
+          timeout: 3000
+          optional: true
+      # If the line is still there, tap the visible text "Kapat" instead of the id.
+      - runFlow:
+          when:
+            visible:
+              id: "account-welcome"
+          commands:
+            - tapOn:
+                text: "Kapat|Close"
+            - extendedWaitUntil:
+                visible: "__qa_fixed_wait_never_present__"
+                timeout: 3000
+                optional: true
+      - assertNotVisible:
+          id: "account-welcome"
+# The finished video's tile must be on screen (library-tile).
+- assertVisible:
+    id: "library-tile"
+# Thumbnails load asynchronously and expose no testID: wait generously.
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: 06-library

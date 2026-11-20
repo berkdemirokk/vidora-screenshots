@@ -1,0 +1,121 @@
+# QA flow "desk" (Kurgu masası, independent). Needs videos in the
+# simulator's Photos: the workflow adds three short speech clips with
+# `xcrun simctl addmedia` before this flow and runs it before any render,
+# so the picker shows exactly those three. Env CAPTION_LOCALE: "tr-TR" or
+# "en-US" (the language of the speech in the clips).
+# Screens: empty desk; three clips with clip 2 selected and Kırp open;
+# Altyazı with captions generated and one line in edit; exporting; result.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+# The Home row's label merges its title and detail line: match by prefix.
+- scroll
+- tapOn: ".*(Kurgu masası|Editing desk).*"
+- extendedWaitUntil:
+    visible:
+      id: "desk-title"
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: "desk-empty-photos"
+    timeout: 15000
+- takeScreenshot: ${OUT}/40-desk-empty
+
+# Three clips from Photos (system picker, multiple selection, videos only).
+- tapOn:
+    id: "desk-empty-photos"
+- extendedWaitUntil:
+    visible: "Fotoğraflar|Photos|Koleksiyonlar|Collections"
+    timeout: 20000
+    optional: true
+- takeScreenshot: ${OUT}/40a-desk-picker
+- tapOn:
+    text: "Video, .*"
+    index: 0
+- tapOn:
+    text: "Video, .*"
+    index: 1
+- tapOn:
+    text: "Video, .*"
+    index: 2
+- takeScreenshot: ${OUT}/40b-desk-picker-three
+- tapOn: "Ekle|Add|Bitti|Done"
+- extendedWaitUntil:
+    visible:
+      id: "desk-clip-3"
+    timeout: 120000
+- tapOn:
+    id: "desk-clip-2"
+- tapOn:
+    id: "desk-tool-trim"
+- assertVisible:
+    id: "desk-trim-start"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/41-desk-three-clips-trim
+
+# Captions (speech recognition; the system may ask for permission once).
+- tapOn:
+    id: "desk-tool-captions"
+- tapOn:
+    id: "desk-locale-${CAPTION_LOCALE}"
+    optional: true
+- takeScreenshot: ${OUT}/42a-desk-captions-before
+- tapOn:
+    id: "desk-captions-generate"
+- tapOn:
+    text: "İzin Ver|Allow|Tamam|OK"
+    optional: true
+- takeScreenshot: ${OUT}/42b-desk-captions-running
+# Generating can be slow on a simulator; record what happened either way so
+# export still runs (a missing 42d means captions were not generated).
+- extendedWaitUntil:
+    visible:
+      id: "desk-captions-edit"
+    timeout: 240000
+    optional: true
+- takeScreenshot: ${OUT}/42c-desk-captions-done
+- runFlow:
+    when:
+      visible:
+        id: "desk-captions-edit"
+    commands:
+      - tapOn:
+          id: "desk-captions-edit"
+      - tapOn:
+          id: "desk-cue-1"
+      - assertVisible:
+          id: "desk-cue-save"
+      - takeScreenshot: ${OUT}/42d-desk-caption-line-in-edit
+      - tapOn:
+          id: "desk-cue-save"
+
+# Export and result.
+- tapOn:
+    id: "desk-export"
+- extendedWaitUntil:
+    visible:
+      id: "desk-export-cancel"
+    timeout: 15000
+    optional: true
+- takeScreenshot: ${OUT}/43-desk-exporting
+- extendedWaitUntil:
+    visible:
+      id: "desk-result-done"
+    timeout: 600000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/44-desk-result
+- tapOn:
+    id: "save-photos"
+- extendedWaitUntil:
+    visible: "Fotoğraflar'a kaydedildi.|Saved to Photos."
+    timeout: 120000
+- takeScreenshot: ${OUT}/44b-desk-result-saved
+- tapOn:
+    id: "desk-result-done"

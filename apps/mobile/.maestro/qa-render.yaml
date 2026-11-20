@@ -1,0 +1,13 @@
+# QA flow "render one video" (independent): relaunch, new editor with the
+# sample product, all texts, then qa-video.yaml with the env given on the
+# command line (NAME, KIND, TEMPLATE, BG, RATIO, STILL, DEST). The list of
+# videos lives in apps/mobile/.maestro/qa-videos.txt; the workflow runs this
+# flow once per line.
+appId: com.berkdemirok.vidora
+---
+- runFlow:
+    file: qa-prep.yaml
+- runFlow:
+    file: qa-texts.yaml
+- runFlow:
+    file: qa-video.yaml

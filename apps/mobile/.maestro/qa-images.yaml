@@ -1,0 +1,69 @@
+# QA: image exports, all saved to Photos. "Görsel olarak kaydet" (save-image
+# in Format) opens an action sheet: "Son kare · 1080p", "Diğer zeminlerde de
+# üret…", the three marketplace images ("Trendyol · 1200×1800",
+# "Kare · 1500×1500", "Amazon · 2000×2000"), "Vazgeç".
+#  - more backdrops: the image-set sheet with its five preselected backdrops
+#  - the three marketplace stills (text-free on white)
+# Independent flow: relaunch, new editor with the sample product and texts.
+appId: com.berkdemirok.vidora
+---
+- runFlow:
+    file: qa-prep.yaml
+- runFlow:
+    file: qa-texts.yaml
+- runFlow:
+    when:
+      notVisible:
+        id: "ratio-.*"
+    commands:
+      - tapOn:
+          id: "tool-format"
+- assertVisible:
+    id: "save-image"
+
+# Image set (more backdrops).
+- tapOn:
+    id: "save-image"
+- extendedWaitUntil:
+    visible: "Son kare · 1080p|Last frame · 1080p"
+    timeout: 10000
+- takeScreenshot: ${OUT}/12-save-image-sheet
+- tapOn: "Diğer zeminlerde de üret…|Make it on more backdrops…"
+- extendedWaitUntil:
+    visible:
+      id: "image-set-start"
+    timeout: 10000
+- takeScreenshot: ${OUT}/12a-image-set-sheet
+- tapOn:
+    id: "image-set-start"
+- tapOn:
+    text: "İzin Ver|Allow|Tam Erişime İzin Ver|Allow Full Access|Fotoğraf Ekle|Add Photos Only"
+    optional: true
+- extendedWaitUntil:
+    notVisible:
+      id: "image-set-start"
+    timeout: 300000
+- extendedWaitUntil:
+    visible: ".*kaydedildi.*|.*saved.*"
+    timeout: 300000
+- takeScreenshot: ${OUT}/12c-image-set-done
+- tapOn:
+    id: "image-set-close"
+    optional: true
+
+# Marketplace stills, one sheet option each; wait for each confirmation.
+- runFlow:
+    file: qa-marketplace-one.yaml
+    env:
+      OPTION: "Trendyol · 1200×1800"
+      SHOT: "13a-marketplace-trendyol"
+- runFlow:
+    file: qa-marketplace-one.yaml
+    env:
+      OPTION: "Kare · 1500×1500"
+      SHOT: "13b-marketplace-square"
+- runFlow:
+    file: qa-marketplace-one.yaml
+    env:
+      OPTION: "Amazon · 2000×2000"
+      SHOT: "13c-marketplace-amazon"

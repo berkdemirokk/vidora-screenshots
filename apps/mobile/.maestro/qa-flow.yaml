@@ -1,0 +1,499 @@
+# Fast verification flow: ONE real photo -> editor -> two texts -> render -> result -> save.
+# No sample-product. Paywall is bypassed by the build (EXPO_PUBLIC_SCREENSHOT_MODE=1), as in qa-short.
+# Env: OUT (screenshot prefix; the workflow passes OUT=qa), TEMPLATE (campaign|discount|showcase,
+# default campaign; discount/showcase pick that template first and discount also fills the old price).
+# Journey: Home "Fotoğraf seç" (home-create) opens the photo source sheet directly (no start view).
+# Selectors WITHOUT a testID: the system picker's first thumbnail (text "Fotoğraf, <date>"),
+# and the saved confirmation (text). Everything else uses testIDs.
+appId: com.berkdemirok.vidora
+---
+# A header "env: TEMPLATE: campaign" overrides the -e value (run 23: discount and showcase rendered
+# campaign). So there is no header default; the template comes from -e, with campaign as the fallback.
+- evalScript: "${output.tpl = (typeof TEMPLATE !== 'undefined' && TEMPLATE) ? String(TEMPLATE) : 'campaign'}"
+- evalScript: ${console.log('TEMPLATE=' + output.tpl)}
+# ENTRY=sample opens the editor with the bundled sample ("Örnekle dene", no system picker);
+# anything else uses the real photo picker (kept for the small-screen job).
+- evalScript: "${output.entry = (typeof ENTRY !== 'undefined' && ENTRY == 'sample') ? 'sample' : 'picker'}"
+- evalScript: ${console.log('ENTRY=' + output.entry)}
+# Visible name of the template tile, for a tap by text when the id tap has no effect.
+- evalScript: "${output.tplLabel = output.tpl == 'discount' ? 'İndirim|Discount' : (output.tpl == 'showcase' ? 'Vitrin|Showcase' : 'Kampanya|Campaign')}"
+- assertTrue: ${output.tpl == 'campaign' || output.tpl == 'discount' || output.tpl == 'showcase'}
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:            # assertion 1
+    visible:
+      id: "home-create"
+    timeout: 60000
+# A first tap right after launch can be lost (run 18 stayed on Home), so wait
+# for the animation and retry the tap until the photo source sheet shows.
+- waitForAnimationToEnd:
+    timeout: 3000
+# Home screenshot: wait (up to 30 s, optional) until the poster-diag element reads
+# poster:campaign:ready... or failed:...; the build has EXPO_PUBLIC_QA_DIAG=1.
+- extendedWaitUntil:
+    visible: "poster:[a-z]+:(ready.*|failed:.*)"
+    timeout: 30000
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}-home
+# ---- entry: real photo picker ----
+- runFlow:
+    when:
+      true: ${output.entry == 'picker'}
+    commands:
+      # Tap ONCE and give the app 8 s to show the photo source sheet. A blind retry would hit the new
+      # screen's viewfinder (run 22: Maestro's own retry made one tap last 6.7 s, so the sheet was
+      # requested twice). Re-tap only if the sheet is still missing AND Home (home-create) is still shown.
+      - tapOn:
+          id: "home-create"
+          retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible: "Galeriden seç|Choose from library"
+          timeout: 8000
+          optional: true
+      - repeat:
+          times: 2
+          while:
+            notVisible: "Galeriden seç|Choose from library"
+          commands:
+            - runFlow:
+                when:
+                  visible:
+                    id: "home-create"
+                commands:
+                  - tapOn:
+                      id: "home-create"
+                      retryTapIfNoChange: false
+            - extendedWaitUntil:
+                visible: "Galeriden seç|Choose from library"
+                timeout: 8000
+                optional: true
+      # iOS action sheet opened by Home (ActionSheetIOS in create.tsx, opens ~350 ms after the editor mounts).
+      - extendedWaitUntil:
+          visible: "Galeriden seç|Choose from library"
+          timeout: 30000
+      - tapOn:
+          text: "Galeriden seç|Choose from library"
+      # System photo picker (out of process, no testIDs): first thumbnail.
+      - extendedWaitUntil:
+          visible: "Fotoğraflar|Photos|Albümler|Albums|Koleksiyonlar|Collections"
+          timeout: 20000
+          optional: true
+      - takeScreenshot: ${OUT}-picker
+      # The picker shows "Yükleniyor..." first (run 21): wait for a photo cell
+      # before tapping, with a generous timeout.
+      - extendedWaitUntil:
+          visible: "(Fotoğraf|Photo), .*"
+          timeout: 60000
+          optional: true
+      - tapOn:
+          text: "(Fotoğraf|Photo), .*"
+          index: 0
+          optional: true
+      - runFlow:
+          when:
+            visible: "Koleksiyonlar|Collections"
+          commands:
+            - tapOn:
+                point: "17%, 23%"
+      # Run 21: the system picker sat on "Yükleniyor..." and fell back to its grid
+      # without selecting. If it is still open after 40 s, tap another thumbnail
+      # (up to 3 times) before the assertion below.
+      - extendedWaitUntil:
+          visible:
+            id: "render-button"
+          timeout: 40000
+          optional: true
+      - repeat:
+          times: 3
+          while:
+            notVisible:
+              id: "render-button"
+          commands:
+            - runFlow:
+                when:
+                  visible: "Koleksiyonlar|Collections"
+                commands:
+                  - tapOn:
+                      point: "50%, 23%"
+            - extendedWaitUntil:
+                visible:
+                  id: "render-button"
+                timeout: 40000
+                optional: true
+# ---- entry: bundled sample (no system picker) ----
+- runFlow:
+    when:
+      true: ${output.entry == 'sample'}
+    commands:
+      - tapOn:
+          id: "sample-try"
+          retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible:
+            id: "render-button"
+          timeout: 30000
+          optional: true
+      - repeat:
+          times: 2
+          while:
+            notVisible:
+              id: "render-button"
+          commands:
+            - runFlow:
+                when:
+                  visible:
+                    id: "sample-try"
+                commands:
+                  - tapOn:
+                      id: "sample-try"
+                      retryTapIfNoChange: false
+            - extendedWaitUntil:
+                visible:
+                  id: "render-button"
+                timeout: 30000
+                optional: true
+- extendedWaitUntil:            # assertion 3: photo prepared, editor ready
+    visible:
+      id: "render-button"
+    timeout: 120000
+# Şablon panel (all jobs), screenshot, then the optional template tile (discount|showcase).
+- tapOn:
+    id: "tool-template"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}-tool-template
+- runFlow:
+    when:
+      true: ${output.tpl == 'discount' || output.tpl == 'showcase'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "template-${output.tpl}"
+          timeout: 30000
+      - tapOn:
+          id: "template-${output.tpl}"
+      - extendedWaitUntil:
+          visible: "__qa_fixed_wait_never_present__"
+          timeout: 3000
+          optional: true
+      - takeScreenshot: ${OUT}-template
+      # Run 24: the template-discount tap had no visible effect. Is the tile selected now? If not,
+      # tap its visible text instead, wait 3 s, screenshot qa-template-text and check again (the
+      # last assert fails the flow if the template is still not selected).
+      - runFlow:
+          when:
+            notVisible:
+              id: "template-${output.tpl}"
+              selected: true
+          commands:
+            - tapOn:
+                text: ${output.tplLabel}
+            - extendedWaitUntil:
+                visible: "__qa_fixed_wait_never_present__"
+                timeout: 3000
+                optional: true
+            - takeScreenshot: ${OUT}-template-text
+            - assertVisible:
+                id: "template-${output.tpl}"
+                selected: true
+# Arka plan panel, screenshot (before typing).
+- tapOn:
+    id: "tool-background"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}-tool-backdrop
+# Text panel is the default tool; tap its pill only when the headline tab is not showing
+# (a second tap on the active tool must not close the panel).
+- runFlow:
+    when:
+      notVisible:
+        id: "text-tab-headline"
+    commands:
+      - tapOn:
+          id: "tool-text"
+      - waitForAnimationToEnd:
+          timeout: 3000
+# Run 24: the name stayed empty after the new panel steps. Wait for the panel, select the headline
+# tab, wait for the field, type, and check that the text is really in the field.
+- takeScreenshot: ${OUT}-before-name
+# Run 25: the Metin panel now shows all five fields at once ("text-tab-*" are only the field labels),
+# and after tapping field-headline no keyboard came up, so inputText typed into nothing (in the
+# discount job it even hung until the 20 min step timeout). Tap the field itself; if the keyboard's
+# "Bitti" bar is not there after 2 s, tap again; only then type.
+- extendedWaitUntil:
+    visible:
+      id: "field-headline"
+    timeout: 15000
+- tapOn:
+    id: "field-headline"
+    retryTapIfNoChange: false
+# A warned (optional) wait: Maestro then dumps the screen hierarchy of this step, which the workflow
+# reads for "Name focus after tap1" (focused flag, a "Bitti" element, frames).
+- extendedWaitUntil:
+    visible: "__qa_dump_name_tap1__"
+    timeout: 2000
+    optional: true
+- extendedWaitUntil:
+    visible: "Bitti|Done"
+    timeout: 3000
+    optional: true
+- runFlow:
+    when:
+      notVisible: "Bitti|Done"
+    commands:
+      - tapOn:
+          id: "field-headline"
+          retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible: "__qa_dump_name_tap2__"
+          timeout: 2000
+          optional: true
+      - extendedWaitUntil:
+          visible: "Bitti|Done"
+          timeout: 3000
+          optional: true
+- takeScreenshot: ${OUT}-name-focus
+# No keyboard bar means no focus: fail here with a clear message instead of typing into nothing.
+- assertVisible: "Bitti|Done"
+- eraseText: 60
+- inputText: "Yaz Esintisi EDP"
+- assertVisible: "Yaz Esintisi EDP"
+- tapOn:
+    id: "text-tab-price"
+- tapOn:
+    id: "field-price"
+- inputText: "899 TL"
+- runFlow:
+    when:
+      true: ${output.tpl == 'discount'}
+    commands:
+      - tapOn:
+          id: "field-old-price"
+      - inputText: "1.299 TL"
+      - assertVisible: "1.299 TL"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-editor-kb
+# The keyboard (qa-editor-kb above shows the "Bitti" bar). First choice: tap "Bitti".
+# Fallbacks only if render-button is still hidden: Return chain (up to 5), then a tap on the
+# preview thumbnail. Screenshots kb-closed-bitti / -enter / -tap record which one worked.
+- extendedWaitUntil:
+    visible: "Bitti|Done"
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible: "Bitti|Done"
+    commands:
+      - tapOn:
+          text: "Bitti|Done"
+      - waitForAnimationToEnd:
+          timeout: 2000
+- runFlow:
+    when:
+      visible:
+        id: "render-button"
+    commands:
+      - takeScreenshot: ${OUT}-kb-closed-bitti
+- runFlow:
+    when:
+      notVisible:
+        id: "render-button"
+    commands:
+      - repeat:
+          times: 5
+          while:
+            notVisible:
+              id: "render-button"
+          commands:
+            - pressKey: Enter
+            - waitForAnimationToEnd:
+                timeout: 1500
+      - runFlow:
+          when:
+            visible:
+              id: "render-button"
+          commands:
+            - takeScreenshot: ${OUT}-kb-closed-enter
+- runFlow:
+    when:
+      notVisible:
+        id: "render-button"
+    commands:
+      - repeat:
+          times: 3
+          while:
+            notVisible:
+              id: "render-button"
+          commands:
+            # Only inside the editor (its tool pills exist), never on the start view.
+            - runFlow:
+                when:
+                  visible:
+                    id: "tool-text"
+                commands:
+                  - tapOn:
+                      point: "15%, 25%"
+                      optional: true
+            - waitForAnimationToEnd:
+                timeout: 2000
+      - runFlow:
+          when:
+            visible:
+              id: "render-button"
+          commands:
+            - takeScreenshot: ${OUT}-kb-closed-tap
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}-editor
+# render-button sits at the bottom of the editor sheet; wait until the keyboard is gone.
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 15000
+- tapOn:
+    id: "render-button"
+# About 20 s after the tap: one progress screenshot (the render-diag timeline is in it).
+- extendedWaitUntil:
+    visible: "__qa_fixed_wait_never_present__"
+    timeout: 20000
+    optional: true
+- takeScreenshot: ${OUT}-render-progress
+# Poll for the end of the render (60 x ~15 s = 15 min cap). The first command is NOT optional:
+# if the app crashed, Maestro fails it at once ("The app is not running") instead of waiting.
+# render-diag is a QA-only element (timeline text); a "render:fail"/"render:cancelled" line stops the flow.
+- repeat:
+    times: 60
+    while:
+      notVisible:
+        id: "save-photos"
+    commands:
+      - assertVisible: ".*"
+      - copyTextFrom:
+          id: "render-diag"
+          optional: true
+      - evalScript: ${console.log('RENDERDIAG ' + maestro.copiedText)}
+      - runFlow:
+          when:
+            visible: "render:(fail|cancelled).*"
+          commands:
+            - takeScreenshot: ${OUT}-render-failed
+            - assertVisible: "__qa_render_failed_see_render-diag__"
+      - extendedWaitUntil:
+          visible:
+            id: "save-photos"
+          timeout: 15000
+          optional: true
+- extendedWaitUntil:            # assertion 4: render finished (fails here after the 15 min cap)
+    visible:
+      id: "save-photos"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}-result
+- tapOn:
+    id: "save-photos"
+- tapOn:
+    text: "İzin Ver|Allow|Tam Erişime İzin Ver|Allow Full Access|Fotoğraf Ekle|Add Photos Only"
+    optional: true
+- extendedWaitUntil:            # assertion 5: saved state (text, no testID)
+    visible: "Kaydedildi|Saved|Fotoğraflar'a kaydedildi|Saved to Photos"
+    timeout: 120000
+- takeScreenshot: ${OUT}-saved
+# Home after the video was saved: the hero should show the latest video ("SON VİDEON").
+- tapOn:
+    id: "result-done"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 8000
+    optional: true
+# Run 24: result-done left the result screen on, so qa-home-after showed the result. If Home is not
+# there yet, tap the "Bitti" in the result bar (result-bar-done, then its visible text).
+- runFlow:
+    when:
+      notVisible:
+        id: "home-create"
+    commands:
+      - tapOn:
+          id: "result-bar-done"
+          optional: true
+      - runFlow:
+          when:
+            notVisible:
+              id: "home-create"
+          commands:
+            - tapOn:
+                text: "Bitti|Done"
+                optional: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 30000
+    optional: true
+- extendedWaitUntil:
+    visible: "poster:[a-z]+:(ready.*|failed:.*)"
+    timeout: 30000
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${OUT}-home-after
+# Second editor (campaign job only matters, harmless elsewhere): reopening the editor is the other way
+# recycled InputAccessoryView hosts appear. Home -> "Örnekle dene" -> Şablon -> Metin -> tap the name
+# field -> the Bitti bar must come up.
+- runFlow:
+    when:
+      visible:
+        id: "sample-try"
+    commands:
+      - tapOn:
+          id: "sample-try"
+          retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible:
+            id: "render-button"
+          timeout: 30000
+          optional: true
+      - repeat:
+          times: 2
+          while:
+            notVisible:
+              id: "render-button"
+          commands:
+            - runFlow:
+                when:
+                  visible:
+                    id: "sample-try"
+                commands:
+                  - tapOn:
+                      id: "sample-try"
+                      retryTapIfNoChange: false
+            - extendedWaitUntil:
+                visible:
+                  id: "render-button"
+                timeout: 30000
+                optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "render-button"
+          timeout: 60000
+      - tapOn:
+          id: "tool-template"
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - tapOn:
+          id: "tool-text"
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - tapOn:
+          id: "field-headline"
+          retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible: "__qa_dump_name_second__"
+          timeout: 2000
+          optional: true
+      - takeScreenshot: ${OUT}-second-editor-name
+      - assertVisible: "Bitti|Done"

@@ -1,0 +1,279 @@
+# Simulator QA run (no signing, no secrets): compiles the app (including the
+# Swift engine), drives every screen in Turkish with Maestro, renders the
+# videos listed in apps/mobile/.maestro/qa-videos.txt (one maestro run per
+# flow and per video, so one failure does not stop the rest), records the
+# preview and the looks row, and uploads:
+#   qa-shots  – a screenshot of every screen/state, Maestro logs, app log
+#   qa-media  – the app's media (rendered MP4s, cut-outs, stills) + preview.mp4
+#   build-log – only when xcodebuild fails (errors also in the job summary)
+name: Simulator QA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  qa:
+    runs-on: macos-26
+    timeout-minutes: 355
+    env:
+      EXPO_PUBLIC_SCREENSHOT_MODE: "1"
+      CI: "1"
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
+      MAESTRO_CLI_NO_ANALYTICS: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install JS dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Prebuild iOS project
+        working-directory: apps/mobile
+        run: |
+          npx expo prebuild --platform ios --no-install --clean
+          cd ios && pod install
+
+      - name: Build for the simulator
+        id: build
+        working-directory: apps/mobile/ios
+        run: |
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          set -o pipefail
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO 2>&1 \
+            | tee "$GITHUB_WORKSPACE/xcodebuild.log" \
+            | grep -E "error:|warning: .*Karevia|BUILD (SUCCEEDED|FAILED)|\*\* " || true
+          grep -q "BUILD SUCCEEDED" "$GITHUB_WORKSPACE/xcodebuild.log"
+          APP=$(find build/Build/Products -maxdepth 2 -name "*.app" -type d | head -1)
+          echo "APP_PATH=$PWD/$APP" >> "$GITHUB_ENV"
+
+      - name: Summarise build errors
+        if: failure() && steps.build.outcome == 'failure'
+        run: |
+          {
+            echo "## xcodebuild failed"
+            echo
+            echo '```'
+            grep -E "error:" xcodebuild.log | sort -u | head -80 || echo "(no error: lines; see build-log artifact)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: failure() && steps.build.outcome == 'failure'
+        with:
+          name: build-log
+          path: xcodebuild.log
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Create simulator (Turkish, light)
+        run: |
+          TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max" | head -1)
+          [ -z "$TYPE" ] && TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro-Max" | head -1)
+          RUNTIME=$(xcrun simctl list runtimes | grep -o "com.apple.CoreSimulator.SimRuntime.iOS-[0-9-]*" | sort -V | tail -1)
+          UDID=$(xcrun simctl create "QA" "$TYPE" "$RUNTIME")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl spawn "$UDID" defaults write -g AppleLanguages -array tr
+          xcrun simctl spawn "$UDID" defaults write -g AppleLocale -string tr_TR
+          xcrun simctl shutdown "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance light
+          xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi \
+            --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 \
+            --batteryState charged --batteryLevel 100
+          xcrun simctl install "$UDID" "$APP_PATH"
+          # Saving to Photos (video and still) must not stop at a permission alert.
+          xcrun simctl privacy "$UDID" grant photos-add com.berkdemirok.vidora || true
+          xcrun simctl privacy "$UDID" grant photos com.berkdemirok.vidora || true
+          maestro --device "$UDID" hierarchy > /dev/null 2>&1 || true
+
+      - name: Speech clips for the editing desk
+        continue-on-error: true
+        run: |
+          # Three short spoken clips (for captions) added to the simulator's
+          # Photos; the desk flow runs before any render, so the picker shows
+          # exactly these three. Turkish voice when the runner has one.
+          command -v ffmpeg >/dev/null || brew install ffmpeg >/dev/null
+          mkdir -p clips
+          VOICE=$(say -v '?' | awk '/tr_TR/ {print $1; exit}')
+          if [ -n "$VOICE" ]; then
+            echo "CAPTION_LOCALE=tr-TR" >> "$GITHUB_ENV"
+            LINES=("Bu parfüm yaz akşamları için hazırlandı." "Şişe elde üfleme camdan yapıldı." "Bugün siparişte yüzde otuz indirim var.")
+          else
+            VOICE=Samantha
+            echo "CAPTION_LOCALE=en-US" >> "$GITHUB_ENV"
+            LINES=("This perfume was made for summer evenings." "The bottle is hand blown glass." "Order today and save thirty percent.")
+          fi
+          COLORS=(0xD9C9B6 0x9DB3A7 0xC7A0A0)
+          for i in 0 1 2; do
+            say -v "$VOICE" -o "clips/s$i.aiff" "${LINES[$i]}"
+            ffmpeg -loglevel error -y -f lavfi -i "color=c=${COLORS[$i]}:s=1080x1920:r=30" \
+              -i "clips/s$i.aiff" -shortest -c:v libx264 -pix_fmt yuv420p -c:a aac \
+              "clips/clip$((i+1)).mp4"
+          done
+          ls -la clips
+          xcrun simctl addmedia "$UDID" clips/clip1.mp4 clips/clip2.mp4 clips/clip3.mp4
+
+      - name: QA flows (each its own maestro run)
+        id: flows
+        run: |
+          mkdir -p qa-media diag
+          : > diag/results.txt
+          DEV="$UDID"
+          # run_flow <label> <flow> [extra maestro args…]: records PASS/FAIL and
+          # never stops the step, so one failure does not cost the rest.
+          run_flow() {
+            LABEL=$1; FLOW=$2; shift 2
+            START=$(date +%s)
+            if maestro --device "$DEV" test -e OUT=qa -e CAPTION_LOCALE="${CAPTION_LOCALE:-en-US}" "$@" \
+                --test-output-dir "$GITHUB_WORKSPACE/shots/$LABEL" \
+                --debug-output "$GITHUB_WORKSPACE/diag/maestro/$LABEL" \
+                "apps/mobile/.maestro/$FLOW.yaml" < /dev/null; then
+              R=PASS
+            else
+              R=FAIL
+            fi
+            echo "$R $LABEL ($(( $(date +%s) - START ))s)" | tee -a diag/results.txt
+          }
+          record() { xcrun simctl io "$DEV" recordVideo --codec h264 --force "qa-media/$1" & REC=$!; }
+          stop_record() { kill -INT $REC 2>/dev/null || true; wait $REC 2>/dev/null || true; }
+
+          # 1. start: fresh install, Home, start screen, cut-out, panels, texts.
+          run_flow 01-start qa-start
+          # 10 s of the editor with the playing preview, for judging motion.
+          record preview.mp4; sleep 10; stop_record
+          # 2. paywall (top, plans, end, failed state).
+          run_flow 02-paywall qa-paywall
+          # 3. Kurgu masası, before any render (Photos holds only the clips).
+          run_flow 03-desk qa-desk
+          # 4. looks, recorded for the whole flow (first poster drawing).
+          record looks.mp4; run_flow 04-looks qa-looks; stop_record
+          # 5. image set + marketplace stills. 6. own photo (+ video 0).
+          run_flow 05-images qa-images
+          run_flow 06-own-photo qa-own
+          # 7. one maestro run per video in qa-videos.txt.
+          grep -v '^#' apps/mobile/.maestro/qa-videos.txt | grep -v '^[[:space:]]*$' > /tmp/videos.txt
+          while IFS='|' read -r NAME KIND TEMPLATE BG RATIO STILL DEST; do
+            t() { echo "$1" | xargs; }
+            run_flow "07-video-$(t "$NAME")" qa-render \
+              -e NAME="$(t "$NAME")" -e KIND="$(t "$KIND")" -e TEMPLATE="$(t "$TEMPLATE")" \
+              -e BG="$(t "$BG")" -e RATIO="$(t "$RATIO")" -e STILL="$(t "$STILL")" -e DEST="$(t "$DEST")"
+          done < /tmp/videos.txt
+          # 8. screens: Home with videos, Library states, video detail, Settings, licences.
+          run_flow 08-screens qa-screens
+
+          # 9. Reduce Motion on: Home with videos.
+          xcrun simctl spawn "$DEV" defaults write com.apple.Accessibility ReduceMotionEnabled -bool true || true
+          run_flow 09-reduce-motion qa-home-shot -e SHOT="50-home-reduce-motion"
+          xcrun simctl spawn "$DEV" defaults write com.apple.Accessibility ReduceMotionEnabled -bool false || true
+
+          # 10–11. Dynamic Type passes; reset to the default size afterwards.
+          xcrun simctl ui "$DEV" content_size extra-extra-extra-large
+          run_flow 10-dynamic-type-xxxl qa-dyntype -e SIZE="xxxl"
+          xcrun simctl ui "$DEV" content_size accessibility-extra-large
+          run_flow 11-dynamic-type-ax-xl qa-dyntype -e SIZE="ax-xl"
+          xcrun simctl ui "$DEV" content_size large
+
+          # Logs of the main simulator before switching devices.
+          xcrun simctl io "$DEV" screenshot diag/final.png || true
+          xcrun simctl spawn "$DEV" log show --last 330m --info --debug --style compact \
+            --predicate 'process == "Vidora" OR subsystem CONTAINS "vidora"' \
+            > diag/app.log 2>&1 || true
+
+          # 12. One iPhone SE (3rd generation) pass at the default size.
+          SE_TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation" | head -1)
+          RUNTIME=$(xcrun simctl list runtimes | grep -o "com.apple.CoreSimulator.SimRuntime.iOS-[0-9-]*" | sort -V | tail -1)
+          if [ -n "$SE_TYPE" ] && SE=$(xcrun simctl create "QA-SE" "$SE_TYPE" "$RUNTIME" 2>/dev/null); then
+            xcrun simctl boot "$SE"; xcrun simctl bootstatus "$SE" -b
+            xcrun simctl spawn "$SE" defaults write -g AppleLanguages -array tr
+            xcrun simctl spawn "$SE" defaults write -g AppleLocale -string tr_TR
+            xcrun simctl shutdown "$SE"; xcrun simctl boot "$SE"; xcrun simctl bootstatus "$SE" -b
+            xcrun simctl ui "$SE" appearance light
+            xcrun simctl status_bar "$SE" override --time "9:41" --batteryState charged --batteryLevel 100 || true
+            xcrun simctl install "$SE" "$APP_PATH"
+            xcrun simctl privacy "$SE" grant photos-add com.berkdemirok.vidora || true
+            xcrun simctl privacy "$SE" grant photos com.berkdemirok.vidora || true
+            echo "SE_UDID=$SE" >> "$GITHUB_ENV"
+            DEV="$SE"
+            maestro --device "$DEV" hierarchy > /dev/null 2>&1 || true
+            run_flow 12-iphone-se qa-se
+            DEV="$UDID"
+          else
+            echo "SKIP 12-iphone-se (no iPhone SE 3rd generation device type for $RUNTIME)" | tee -a diag/results.txt
+          fi
+
+          grep -A12 "photo quality" diag/app.log > diag/photo-quality.txt || true
+          grep "poster failed" diag/app.log > diag/poster-failures.txt || true
+          grep "VidoraDepth" diag/app.log > diag/depth.txt || true
+          {
+            echo "## Flow results"; echo '```'; cat diag/results.txt; echo '```'
+            echo "## Photo quality"; echo '```'; head -60 diag/photo-quality.txt; echo '```'
+            echo "## Poster failures ($(wc -l < diag/poster-failures.txt))"; echo '```'; head -30 diag/poster-failures.txt; echo '```'
+            echo "## Depth"; echo '```'; head -60 diag/depth.txt; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cp -R "$HOME/.maestro/tests" diag/maestro-tests 2>/dev/null || true
+
+      - name: Copy the app's media out of the simulator
+        if: always()
+        run: |
+          mkdir -p qa-media
+          DATA=$(xcrun simctl get_app_container "$UDID" com.berkdemirok.vidora data 2>/dev/null) || DATA=""
+          echo "Container: $DATA"
+          for dir in Documents Library/Caches tmp; do
+            [ -n "$DATA" ] && [ -d "$DATA/$dir" ] || continue
+            (cd "$DATA/$dir" && find . -type f \( -iname "*.mp4" -o -iname "*.mov" -o -iname "*.m4v" \
+              -o -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.heic" -o -iname "*.json" \) \
+              -size -200M -print0 | rsync -a --from0 --files-from=- ./ "$GITHUB_WORKSPACE/qa-media/$dir/")
+          done
+          # Every rendered video and still saved to Photos. The simulator's six
+          # default sample photos (IMG_0001–0006) are skipped.
+          DCIM="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Media/DCIM"
+          if [ -d "$DCIM" ]; then
+            (cd "$DCIM" && find . -type f ! -name "IMG_000[1-6].*" -print0 \
+              | rsync -a --from0 --files-from=- ./ "$GITHUB_WORKSPACE/qa-media/Photos/")
+          fi
+          (cd qa-media && find . -type f | sort | head -400 && du -sh .)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-shots
+          # The simulator's own device log is >1 GB; app.log covers the app.
+          path: |
+            shots
+            diag
+            !**/device-simulator.log
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-media
+          path: qa-media
+          if-no-files-found: warn
+
+      - name: Fail if any flow failed
+        if: always()
+        run: |
+          cat diag/results.txt 2>/dev/null || { echo "no results"; exit 1; }
+          ! grep -q '^FAIL' diag/results.txt

@@ -1,0 +1,58 @@
+# QA flow: one pass on an iPhone SE (3rd generation, 375 pt) at the default
+# text size, on a fresh install: Home (empty), editor, one render and its
+# result before and after saving, Home with that video, paywall top.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: "proof-ready"
+    timeout: 20000
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/70-se-home-empty
+
+- runFlow:
+    file: qa-prep.yaml
+- takeScreenshot: ${OUT}/71-se-editor
+- runFlow:
+    file: qa-texts.yaml
+- takeScreenshot: ${OUT}/71b-se-editor-texts
+- tapOn:
+    id: "render-button"
+- extendedWaitUntil:
+    visible:
+      id: "save-photos"
+    timeout: 900000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/72-se-result
+- tapOn:
+    id: "save-photos"
+- extendedWaitUntil:
+    visible: "Fotoğraflar'a kaydedildi.|Saved to Photos."
+    timeout: 120000
+- takeScreenshot: ${OUT}/72b-se-result-saved
+- runFlow:
+    file: qa-go-home.yaml
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/73-se-home-with-video
+
+- openLink: "vidora://paywall"
+- tapOn:
+    text: "Aç|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "paywall-close"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/74-se-paywall

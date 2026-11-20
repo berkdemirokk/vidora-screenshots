@@ -1,0 +1,97 @@
+# Short QA run: one video, set up by taps only, rendered, saved to Photos.
+# Env: NAME, TEMPLATE (template id), BG (backdrop-<id>), RATIO (9x16|4x5|1x1),
+# DEST (social|marketplace), EXTRAS ("1" = also the last-frame still and the
+# Trendyol marketplace image from the result view).
+# The only hard waits are the ones that reach the render and its result.
+appId: com.berkdemirok.vidora
+---
+- runFlow:
+    file: qa-s-prep.yaml
+- runFlow:
+    file: qa-s-texts.yaml
+
+# Template (Şablonlar mode), backdrop, ratio and destination: taps only.
+- tapOn:
+    id: "tool-template"
+- tapOn:
+    id: "template-mode-templates"
+- repeat:
+    times: 4
+    while:
+      notVisible:
+        id: "template-${TEMPLATE}"
+    commands:
+      - swipe:
+          from:
+            id: "template-(?!mode-).*"
+            index: 0
+          direction: LEFT
+          duration: 600
+- tapOn:
+    id: "template-${TEMPLATE}"
+    optional: true
+- tapOn:
+    id: "tool-background"
+- repeat:
+    times: 5
+    while:
+      notVisible:
+        id: "${BG}"
+    commands:
+      - swipe:
+          start: "85%, 76%"
+          end: "35%, 76%"
+          duration: 600
+- tapOn:
+    id: "${BG}"
+    optional: true
+- tapOn:
+    id: "tool-format"
+- tapOn:
+    id: "ratio-${RATIO}"
+    optional: true
+- tapOn:
+    id: "dest-${DEST}"
+    optional: true
+- takeScreenshot: ${OUT}/${NAME}-editor
+
+# Render and save.
+- tapOn:
+    id: "render-button"
+- extendedWaitUntil:
+    visible:
+      id: "save-photos"
+    timeout: 900000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${NAME}-result
+- tapOn:
+    id: "save-photos"
+- tapOn:
+    text: "İzin Ver|Allow|Tam Erişime İzin Ver|Allow Full Access|Fotoğraf Ekle|Add Photos Only"
+    optional: true
+- extendedWaitUntil:
+    visible: "Fotoğraflar'a kaydedildi.|Saved to Photos."
+    timeout: 120000
+- takeScreenshot: ${OUT}/${NAME}-saved
+
+# Still and marketplace image from the result view.
+- runFlow:
+    when:
+      true: "${EXTRAS === '1'}"
+    commands:
+      - tapOn:
+          id: "result-image"
+      - takeScreenshot: ${OUT}/${NAME}-still-sheet
+      - tapOn: "Son kare · 1080p|Last frame · 1080p"
+      - extendedWaitUntil:
+          visible: ".*kaydedildi.*|.*saved.*"
+          timeout: 120000
+      - takeScreenshot: ${OUT}/${NAME}-still-saved
+      - tapOn:
+          id: "result-image"
+      - tapOn: "Trendyol · 1200×1800"
+      - extendedWaitUntil:
+          visible: ".*kaydedildi.*|.*saved.*"
+          timeout: 120000
+      - takeScreenshot: ${OUT}/${NAME}-marketplace-saved

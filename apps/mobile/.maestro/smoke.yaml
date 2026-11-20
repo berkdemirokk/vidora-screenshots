@@ -1,0 +1,37 @@
+# Vidora smoke flow (Maestro). Run: maestro test apps/mobile/.maestro/smoke.yaml
+# Text selectors are regexes matching both TR and EN labels, because the
+# initial language follows the device locale (expo-localization) or the saved choice.
+# Labels come from app/index.tsx, app/editor.tsx, app/library.tsx, app/settings.tsx
+# and src/ui.tsx. They may be reworded by UI changes; if a step fails, re-check
+# those files first. Prefer screen titles and nav labels, which are the most stable.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Çalışma alanı|Your workspace"
+
+# Editing desk
+- tapOn: "Kurgu masası|Editing desk"
+# The desk header shows the project name now, not "Kurgu masası".
+- assertVisible:
+    id: "desk-title"
+
+# Library (bottom nav rendered by Screen in src/ui.tsx)
+- scrollUntilVisible:
+    element:
+      text: "Kitaplık|Library"
+    direction: DOWN
+- tapOn: "Kitaplık|Library"
+- assertVisible: "Proje kitaplığı|Project library"
+
+# Settings (top-right button in src/ui.tsx)
+- tapOn: "Ayarlar|Settings"
+- assertVisible: "Ayarlar ve gizlilik|Settings and privacy"
+
+# Language switch (button labels are fixed, not translated)
+- tapOn: "English"
+- assertVisible: "Settings and privacy"
+- tapOn: "Türkçe"
+- assertVisible: "Ayarlar ve gizlilik"
+- tapOn: "English"
+- assertVisible: "Settings and privacy"

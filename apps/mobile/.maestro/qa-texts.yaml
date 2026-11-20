@@ -1,0 +1,117 @@
+# QA helper: fill headline, price, old price and badge through the Metin
+# tool's field tabs (one editor under a row of tabs; Return moves to the next
+# tab with the keyboard up). Each value is asserted while its input is on
+# screen. CTA keeps its default text. Env SHOT: "1" to take screenshots.
+# Starts and ends in the editor; leaves the Metin panel closed.
+appId: com.berkdemirok.vidora
+---
+- runFlow:
+    when:
+      notVisible:
+        id: "text-tab-headline"
+    commands:
+      - tapOn:
+          id: "tool-text"
+- assertVisible:
+    id: "text-tab-headline"
+- runFlow:
+    when:
+      true: "${typeof SHOT !== 'undefined' && SHOT === '1'}"
+    commands:
+      - takeScreenshot: ${OUT}/07-panel-metin-empty
+
+- tapOn:
+    id: "text-tab-headline"
+- tapOn:
+    id: "field-headline"
+- inputText: "Yaz Esintisi EDP"
+- assertVisible: "Yaz Esintisi EDP"
+- runFlow:
+    when:
+      true: "${typeof SHOT !== 'undefined' && SHOT === '1'}"
+    commands:
+      - takeScreenshot: ${OUT}/07b-keyboard
+
+- tapOn:
+    id: "text-tab-price"
+- tapOn:
+    id: "field-price"
+- inputText: "899 TL"
+- assertVisible: "899 TL"
+
+# Old price sits next to the price in the same "Fiyat" tab.
+- tapOn:
+    id: "field-old-price"
+- inputText: "1.299 TL"
+- assertVisible: "1.299 TL"
+
+- tapOn:
+    id: "field-badge"
+- inputText: "%30 indirim"
+- assertVisible: "%30 indirim"
+- runFlow:
+    when:
+      true: "${typeof SHOT !== 'undefined' && SHOT === '1'}"
+    commands:
+      - takeScreenshot: ${OUT}/08a-metin-badge
+
+- runFlow:
+    when:
+      true: "${typeof SHOT !== 'undefined' && SHOT === '1'}"
+    commands:
+      - takeScreenshot: ${OUT}/08b-metin-cta
+- runFlow:
+    when:
+      true: "${typeof SHOT !== 'undefined' && SHOT === '1'}"
+    commands:
+      - takeScreenshot: ${OUT}/08c-metin-font
+# Leave the Metin panel as it is: the first tap on a tool only dismisses the
+# keyboard, and every later flow step opens the panel it needs on its own.
+
+# Batch 4: campaign presets, price tags and (Turkish, inside their date window)
+# season sets sit above the fields while the keyboard is closed. Close the
+# keyboard first, wait for the chips, then tap. Seasons depend on the date, so
+# they are optional taps.
+- tapOn:
+    id: "done-field-cta"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "preset-kargo-bedava"
+    timeout: 10000
+- tapOn:
+    id: "preset-kargo-bedava"
+- assertVisible:
+    id: "preset-kargo-bedava"
+    selected: true
+- assertVisible:
+    id: "preset-son-3"
+- assertVisible:
+    id: "preset-indirim-40"
+- scrollUntilVisible:
+    element:
+      id: "preset-kapida-odeme"
+    direction: RIGHT
+    timeout: 8000
+- tapOn:
+    id: "preset-kapida-odeme"
+- assertVisible:
+    id: "preset-kapida-odeme"
+    selected: true
+- assertVisible:
+    id: "pricetag-classic"
+- tapOn:
+    id: "pricetag-pill"
+- assertVisible:
+    id: "pricetag-pill"
+    selected: true
+- tapOn:
+    id: "pricetag-below"
+- tapOn:
+    id: "season-blackFriday"
+    optional: true
+- runFlow:
+    when:
+      true: "${typeof SHOT !== 'undefined' && SHOT === '1'}"
+    commands:
+      - takeScreenshot: ${OUT}/09-metin-presets

@@ -1,0 +1,6 @@
+{
+  "NSPhotoLibraryUsageDescription": "Vidora verwendet das Foto, das du auswählst, um dein Produkt freizustellen und sein Werbevideo zu erstellen. Fotos bleiben auf deinem iPhone.",
+  "NSPhotoLibraryAddUsageDescription": "Vidora sichert die Videos, die du erstellst, in deiner Fotomediathek.",
+  "NSSpeechRecognitionUsageDescription": "Vidora verwendet die Spracherkennung, um gesprochene Worte in deinen Videos in Untertitel umzuwandeln. Wenn keine Erkennung auf dem Gerät möglich ist, kann das Audio von Apple verarbeitet werden.",
+  "NSCameraUsageDescription": "Vidora verwendet die Kamera, damit du dein Produkt für sein Werbevideo fotografieren kannst."
+}

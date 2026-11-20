@@ -1,0 +1,89 @@
+# QA: own photo as the backdrop (Arka plan → backdrop-own → system photo
+# picker → first sample photo), then size +2, position down, dark text.
+# Independent flow: relaunch, new editor with the sample product and texts;
+# ends by rendering video 0 on the own photo and saving it to Photos.
+appId: com.berkdemirok.vidora
+---
+- runFlow:
+    file: qa-prep.yaml
+- runFlow:
+    file: qa-texts.yaml
+- runFlow:
+    when:
+      notVisible:
+        id: "backdrop-.*"
+    commands:
+      - tapOn:
+          id: "tool-background"
+- tapOn:
+    id: "backdrop-own"
+# System photo picker (out of process). Pick the first photo; fall back to
+# a tap on the first grid cell.
+- extendedWaitUntil:
+    visible: "Fotoğraflar|Photos|Albümler|Albums|Koleksiyonlar|Collections"
+    timeout: 20000
+    optional: true
+- takeScreenshot: ${OUT}/14a-photo-picker
+# Photo cells are labelled "Fotoğraf, <date>" ("Photo, <date>"). The app
+# then prepares the photo for a moment; only fall back to a grid tap if the
+# own-photo controls never appear (a second tap could reopen the picker).
+- tapOn:
+    text: "(Fotoğraf|Photo), .*"
+    index: 0
+    optional: true
+# Wait for the picker to close and "Fotoğraf hazırlanıyor…" to finish.
+- extendedWaitUntil:
+    notVisible: "Koleksiyonlar|Collections"
+    timeout: 15000
+    optional: true
+- extendedWaitUntil:
+    notVisible: "Fotoğraf hazırlanıyor…|Preparing the photo…"
+    timeout: 30000
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "own-size-more"
+    timeout: 30000
+    optional: true
+- runFlow:
+    when:
+      visible: "Koleksiyonlar|Collections"
+    commands:
+      - tapOn:
+          point: "17%, 23%"
+- extendedWaitUntil:
+    visible:
+      id: "own-size-more"
+    timeout: 60000
+- extendedWaitUntil:
+    notVisible: "Önizleme hazırlanıyor|Preparing the preview"
+    timeout: 120000
+    optional: true
+- takeScreenshot: ${OUT}/14b-own-backdrop-default
+- tapOn:
+    id: "own-size-more"
+- tapOn:
+    id: "own-size-more"
+- tapOn:
+    id: "own-position-more"
+- tapOn:
+    id: "own-text-dark"
+- assertVisible:
+    id: "own-text-dark"
+    selected: true
+- extendedWaitUntil:
+    notVisible: "Önizleme hazırlanıyor|Preparing the preview"
+    timeout: 120000
+    optional: true
+- takeScreenshot: ${OUT}/14c-own-backdrop-adjusted
+
+- runFlow:
+    file: qa-video.yaml
+    env:
+      NAME: "0-own-photo-9x16"
+      KIND: "promotion"
+      TEMPLATE: "showcase"
+      BG: "keep"
+      RATIO: "9x16"
+      STILL: ""
+      DEST: ""

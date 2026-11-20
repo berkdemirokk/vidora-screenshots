@@ -1,0 +1,24 @@
+# QA helper: open the first Library tile matching TILE (label regex), capture the video detail top and
+# bottom (SHOT-top / SHOT-bottom), and go back to Library. Starts in Library.
+appId: com.berkdemirok.vidora
+---
+- tapOn:
+    text: ${TILE}
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "video-duplicate"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/${SHOT}-top
+- scroll
+- scroll
+- assertVisible:
+    id: "video-delete"
+- takeScreenshot: ${OUT}/${SHOT}-bottom
+- tapOn: "Geri|Back"
+- extendedWaitUntil:
+    visible:
+      id: "library-segment"
+    timeout: 10000

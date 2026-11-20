@@ -1,0 +1,26 @@
+# Short QA run helper: fresh start into a new editor with the sample product.
+# Minimal: waits only for what the next step needs; the preview wait is soft.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- tapOn:
+    id: "home-create"
+- extendedWaitUntil:
+    visible:
+      id: "sample-product"
+    timeout: 30000
+- tapOn:
+    id: "sample-product"
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "Video önizlemesi|Video preview"
+    timeout: 60000
+    optional: true

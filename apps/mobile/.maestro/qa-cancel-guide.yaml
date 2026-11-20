@@ -1,0 +1,22 @@
+# QA flow "cancel-guide": Settings > "Abonelik iptal ve iade" shows the steps,
+# the subscriptions button and the refund link.
+#   maestro test -e OUT=qa apps/mobile/.maestro/qa-cancel-guide.yaml
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- openLink: "vidora://cancel-guide"
+- tapOn:
+    text: "Aç|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "cancel-open-subscriptions"
+    timeout: 20000
+- assertVisible:
+    id: "cancel-refund-link"
+- takeScreenshot: ${OUT}/42-cancel-guide

@@ -1,0 +1,124 @@
+# App Store screenshots on an iOS simulator (no signing, no secrets).
+# Builds the app for the simulator with EXPO_PUBLIC_SCREENSHOT_MODE=1 (Pro look
+# without a purchase; never used for store builds), runs the Maestro flow in
+# Turkish and English on an iPhone 17 Pro Max (6.9", 1320x2868) and uploads
+# the raw captures as an artifact.
+name: Store screenshots
+
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: macos-26
+    timeout-minutes: 150
+    env:
+      EXPO_PUBLIC_SCREENSHOT_MODE: "1"
+      CI: "1"
+      # The XCTest driver starts slowly on hosted runners (default timeout is too short).
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
+      MAESTRO_CLI_NO_ANALYTICS: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install JS dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Prebuild iOS project
+        working-directory: apps/mobile
+        run: |
+          npx expo prebuild --platform ios --no-install --clean
+          cd ios && pod install
+
+      - name: Build for the simulator
+        working-directory: apps/mobile/ios
+        run: |
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          set -o pipefail
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO -quiet
+          APP=$(find build/Build/Products -maxdepth 2 -name "*.app" -type d | head -1)
+          echo "APP_PATH=$PWD/$APP" >> "$GITHUB_ENV"
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Create simulator
+        run: |
+          TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max" | head -1)
+          [ -z "$TYPE" ] && TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro-Max" | head -1)
+          RUNTIME=$(xcrun simctl list runtimes | grep -o "com.apple.CoreSimulator.SimRuntime.iOS-[0-9-]*" | sort -V | tail -1)
+          UDID=$(xcrun simctl create "Shots" "$TYPE" "$RUNTIME")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          echo "$TYPE on $RUNTIME -> $UDID"
+
+      - name: Screenshots (Turkish, then English)
+        run: |
+          shoot() {
+            LANG_CODE=$1; LOCALE=$2; HEADLINE=$3; PRICE=$4; BADGE=$5
+            xcrun simctl boot "$UDID" || true
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl spawn "$UDID" defaults write -g AppleLanguages -array "$LANG_CODE"
+            xcrun simctl spawn "$UDID" defaults write -g AppleLocale -string "$LOCALE"
+            xcrun simctl shutdown "$UDID"
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID" -b
+            # The app is light-themed; keep system UI (status bar, sheets) light too.
+            xcrun simctl ui "$UDID" appearance light
+            xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi \
+              --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 \
+              --batteryState charged --batteryLevel 100
+            xcrun simctl install "$UDID" "$APP_PATH"
+            mkdir -p shots
+            # Warm up the driver once so the flow itself does not time out.
+            maestro --device "$UDID" hierarchy > /dev/null 2>&1 || true
+            set +e
+            # takeScreenshot paths must stay inside Maestro's output folder.
+            maestro --device "$UDID" test -e OUT="$LANG_CODE" \
+              -e HEADLINE="$HEADLINE" -e PRICE="$PRICE" -e BADGE="$BADGE" \
+              --test-output-dir "$GITHUB_WORKSPACE/shots" \
+              --debug-output "$GITHUB_WORKSPACE/diag/$LANG_CODE/maestro" \
+              apps/mobile/.maestro/screenshots.yaml
+            CODE=$?
+            set -e
+            # Diagnostics for every run: final screen, app log, Maestro files.
+            mkdir -p "diag/$LANG_CODE"
+            xcrun simctl io "$UDID" screenshot "diag/$LANG_CODE/final.png" || true
+            xcrun simctl spawn "$UDID" log show --last 20m --style compact \
+              --predicate 'process == "Vidora" OR subsystem CONTAINS "vidora"' \
+              > "diag/$LANG_CODE/app.log" 2>&1 || true
+            cp -R "$HOME/.maestro/tests" "diag/$LANG_CODE/maestro-tests" 2>/dev/null || true
+            xcrun simctl shutdown "$UDID" || true
+            return $CODE
+          }
+          STATUS=0
+          # Product texts typed into the video, per language.
+          shoot tr tr_TR "Yaz Esintisi EDP" "899 TL" "%30 indirim" || STATUS=1
+          shoot en en_US "Summer Breeze EDP" '$29' "30% off" || STATUS=1
+          exit $STATUS
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: |
+            shots
+            diag
+          if-no-files-found: warn

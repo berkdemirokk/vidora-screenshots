@@ -1,0 +1,221 @@
+# App Store screenshot pipeline: ONE flow on the bundled sample (deterministic) that takes
+# six clean raw shots on an iPhone 17 Pro Max (1320x2868) in the chosen language.
+# Build, cache key, simulator setup and Maestro steps are copied from qa-flow.yml, so the
+# native build cache is shared with it. Upload: artifact "store-raw-<locale>" (01..06 PNGs, plus optional 07-templates).
+# On failure: "store-fail-<locale>" (final.png, Maestro debug, last 80 app log lines).
+# Then compose on a PC: python tools/compose_store_screens.py <raw_dir> <locale> <out_dir>
+name: Store screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      locale:
+        description: "Language of the screenshots"
+        type: choice
+        options:
+          - tr
+          - en
+        default: tr
+      force_native:
+        description: "Force a full native build (ignore the cache)"
+        type: boolean
+        default: false
+
+jobs:
+  shots:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_SCREENSHOT_MODE: "1"
+      EXPO_PUBLIC_ACCOUNTS: "1"   # production ships with accounts on; the store shots must match
+      CI: "1"
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
+      MAESTRO_CLI_NO_ANALYTICS: "1"
+      LOCALE: ${{ inputs.locale }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Select newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          echo "XCODE_ID=$(basename "$XCODE" .app)" >> "$GITHUB_ENV"
+
+      # Same key as qa-flow.yml, so both workflows reuse one native build.
+      - name: Compute native cache key
+        run: echo "NATIVE_KEY=vidora-native-$XCODE_ID-${{ hashFiles('package-lock.json', 'apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/modules/**', 'apps/mobile/plugins/**') }}" >> "$GITHUB_ENV"
+
+      - name: Restore native build cache
+        id: cache
+        if: ${{ !inputs.force_native }}
+        uses: actions/cache/restore@v4
+        with:
+          path: apps/mobile/ios
+          key: ${{ env.NATIVE_KEY }}
+
+      - name: Plan
+        id: plan
+        run: |
+          if [ "${{ steps.cache.outputs.cache-hit }}" = "true" ] && [ "${{ inputs.force_native }}" != "true" ]; then
+            echo "full=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install JS dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Prebuild iOS project
+        if: steps.plan.outputs.full == 'true'
+        working-directory: apps/mobile
+        run: |
+          echo "**NATIVE CHANGED - full build**" >> "$GITHUB_STEP_SUMMARY"
+          npx expo prebuild --platform ios --no-install --clean
+          cd ios && pod install
+
+      - name: Note cached build
+        if: steps.plan.outputs.full == 'false'
+        run: |
+          echo "**CACHED - incremental build (Pods + DerivedData restored)**" >> "$GITHUB_STEP_SUMMARY"
+          # The restored ios/.xcode.env.local names the previous run's node; point it at this runner's node.
+          echo "export NODE_BINARY=$(command -v node)" > apps/mobile/ios/.xcode.env.local
+
+      - name: Build for the simulator
+        id: build
+        timeout-minutes: 45
+        working-directory: apps/mobile/ios
+        run: |
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME="${WORKSPACE%.xcworkspace}"
+          set -o pipefail
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO 2>&1 \
+            | tee "$GITHUB_WORKSPACE/xcodebuild.log" \
+            | grep -E "error:|warning: .*Karevia|BUILD (SUCCEEDED|FAILED)|\*\* " || true
+          grep -q "BUILD SUCCEEDED" "$GITHUB_WORKSPACE/xcodebuild.log"
+          APP=$(find build/Build/Products -maxdepth 2 -name "*.app" -type d | head -1)
+          echo "APP_PATH=$PWD/$APP" >> "$GITHUB_ENV"
+
+      - name: Save native build cache
+        if: steps.build.outcome == 'success' && steps.plan.outputs.full == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: apps/mobile/ios
+          key: ${{ env.NATIVE_KEY }}
+
+      - name: Summarise build errors
+        if: failure() && steps.build.outcome == 'failure'
+        run: |
+          {
+            echo "## FAILED AT: Build for the simulator"
+            echo '```'
+            grep -E "error:" xcodebuild.log | sort -u | head -80 || echo "(no error: lines; see build-log artifact)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: failure() && steps.build.outcome == 'failure'
+        with:
+          name: build-log
+          path: xcodebuild.log
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Create simulator (language from the locale input, light, 9:41)
+        run: |
+          if [ "$LOCALE" = "tr" ]; then LANG_CODE=tr; LOC=tr_TR; else LANG_CODE=en; LOC=en_US; fi
+          TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max" | head -1)
+          [ -z "$TYPE" ] && TYPE=$(xcrun simctl list devicetypes | grep -o "com.apple.CoreSimulator.SimDeviceType.iPhone-16-Pro-Max" | head -1)
+          RUNTIME=$(xcrun simctl list runtimes | grep -o "com.apple.CoreSimulator.SimRuntime.iOS-[0-9-]*" | sort -V | tail -1)
+          UDID=$(xcrun simctl create "STORE" "$TYPE" "$RUNTIME")
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl spawn "$UDID" defaults write -g AppleLanguages -array "$LANG_CODE"
+          xcrun simctl spawn "$UDID" defaults write -g AppleLocale -string "$LOC"
+          xcrun simctl shutdown "$UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance light
+          xcrun simctl status_bar "$UDID" override --time "9:41" --dataNetwork wifi \
+            --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 \
+            --batteryState charged --batteryLevel 100
+          xcrun simctl install "$UDID" "$APP_PATH"
+          xcrun simctl privacy "$UDID" grant photos-add com.berkdemirok.vidora || true
+          xcrun simctl privacy "$UDID" grant photos com.berkdemirok.vidora || true
+          maestro --device "$UDID" hierarchy > /dev/null 2>&1 || true
+
+      - name: Run the store flow
+        id: flow
+        timeout-minutes: 25
+        run: |
+          mkdir -p diag shots
+          if [ "$LOCALE" = "tr" ]; then
+            NAME="Lavanta Yağı"; PRICE="349"; LABEL="Yeni sezon"; BUTTON="Hemen al"
+          else
+            NAME="Lavender Oil"; PRICE="19"; LABEL="New season"; BUTTON="Shop now"
+          fi
+          set +e
+          maestro --device "$UDID" test \
+            -e NAME="$NAME" -e PRICE="$PRICE" -e LABEL="$LABEL" -e BUTTON="$BUTTON" \
+            --test-output-dir "$GITHUB_WORKSPACE/shots" \
+            --debug-output "$GITHUB_WORKSPACE/diag/maestro" \
+            apps/mobile/.maestro/store-screens.yaml < /dev/null 2>&1 | tee diag/maestro.out
+          RC=${PIPESTATUS[0]}
+          exit $RC
+
+      - name: Collect the raw shots
+        if: always()
+        run: |
+          mkdir -p raw
+          # takeScreenshot files are named 01-home.png ... 06-library.png (step screenshots are step-*.png).
+          find shots -type f -name "0[1-7]-*.png" | while read -r f; do cp "$f" "raw/$(basename "$f")"; done
+          ls -la raw
+          N=$(ls raw/*.png 2>/dev/null | wc -l | tr -d ' ')
+          echo "Raw shots: $N (6 required, 07-templates optional) ($LOCALE)" >> "$GITHUB_STEP_SUMMARY"
+          for f in raw/*.png; do sips -g pixelWidth -g pixelHeight "$f" | tr '\n' ' '; echo; done || true
+          [ "$N" -ge 6 ]
+
+      - name: Failure bundle
+        if: always()
+        run: |
+          mkdir -p diag
+          xcrun simctl io "$UDID" screenshot diag/final.png || true
+          xcrun simctl spawn "$UDID" log show --last 40m --info --debug --style compact \
+            --predicate 'process == "Vidora" OR subsystem CONTAINS "vidora"' 2>/dev/null | tail -n 80 > diag/app-last80.log || true
+          if [ "${{ steps.flow.outcome }}" != "success" ]; then
+            STEP=$(grep -m1 -E "FAILED|Failed|❌" diag/maestro.out 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | head -c 200)
+            if [ -z "$STEP" ]; then STEP="(see diag/maestro.out; flow outcome ${{ steps.flow.outcome }})"; fi
+            { echo "## FAILED AT: $STEP"; echo; echo '```'; tail -n 15 diag/app-last80.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Store flow PASSED (artifact: store-raw-$LOCALE)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: store-raw-${{ inputs.locale }}
+          path: raw/*.png
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: store-fail-${{ inputs.locale }}
+          path: |
+            diag
+            shots
+            !**/device-simulator.log
+          if-no-files-found: warn

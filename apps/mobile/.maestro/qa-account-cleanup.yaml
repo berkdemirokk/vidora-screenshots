@@ -1,0 +1,67 @@
+# Best-effort cleanup for qa-account.yaml: sign in with the test credentials (EMAIL, PW from the
+# workflow) and delete the account, so a failed run leaves no test user in Firebase. Every step
+# is optional: if the account is already gone, the sign-in simply fails and nothing happens.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "tab-settings"
+    timeout: 60000
+    optional: true
+- tapOn:
+    id: "tab-settings"
+    optional: true
+- tapOn:
+    id: "settings-account"
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "account-signed-email"
+    commands:
+      - tapOn:
+          id: "account-mode-signin"
+          optional: true
+      - tapOn:
+          id: "account-email"
+          optional: true
+      - inputText: ${EMAIL}
+      - tapOn:
+          id: "account-password"
+          optional: true
+      - inputText: ${PW}
+      - tapOn:
+          point: "50%, 12%"
+          optional: true
+      - tapOn:
+          id: "account-submit"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "account-signed-email"
+          timeout: 20000
+          optional: true
+- runFlow:
+    when:
+      visible:
+        id: "account-signed-email"
+    commands:
+      - tapOn:
+          id: "account-delete"
+      - tapOn:
+          id: "account-delete-continue"
+      - tapOn:
+          id: "account-delete-password"
+      - inputText: ${PW}
+      - tapOn:
+          point: "50%, 12%"
+          optional: true
+      - tapOn:
+          id: "account-delete-confirm"
+      - extendedWaitUntil:
+          visible:
+            id: "account-status"
+          timeout: 20000
+          optional: true

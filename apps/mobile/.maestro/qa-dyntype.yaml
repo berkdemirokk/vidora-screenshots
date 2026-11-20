@@ -1,0 +1,57 @@
+# QA flow: one Dynamic Type pass (the workflow sets the text size with
+# `xcrun simctl ui <udid> content_size …` before it). Env SIZE names the
+# screenshots. Captures Home, the editor stage, Arka plan, Şablon in both
+# modes (Şablonlar, Görünümler) and the paywall top.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/60-${SIZE}-home
+- scroll
+- takeScreenshot: ${OUT}/60-${SIZE}-home-scrolled
+
+- runFlow:
+    file: qa-prep.yaml
+- takeScreenshot: ${OUT}/61-${SIZE}-editor-stage
+- runFlow:
+    when:
+      notVisible:
+        id: "backdrop-marble-white"
+    commands:
+      - tapOn:
+          id: "tool-background"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/62-${SIZE}-arka-plan
+- tapOn:
+    id: "tool-template"
+- tapOn:
+    id: "template-mode-templates"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/63-${SIZE}-sablonlar
+- tapOn:
+    id: "template-mode-looks"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}/64-${SIZE}-gorunumler
+
+- openLink: "vidora://paywall"
+- tapOn:
+    text: "Aç|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "paywall-close"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}/65-${SIZE}-paywall
+- tapOn:
+    id: "paywall-close"

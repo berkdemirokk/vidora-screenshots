@@ -1,0 +1,247 @@
+# Extra screens for the owner (independent of qa-flow; run after it, failures tolerated):
+# Start view (qa-start), Library tab, Settings tab, paywall top and plans. Env: OUT (the workflow passes OUT=qa).
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- waitForAnimationToEnd:
+    timeout: 3000
+# qa-start: Home's "Fotoğraf seç" opens the photo source sheet over the start view; cancel the
+# sheet ("Vazgeç") to reach the viewfinder. Optional end to end, so a miss never blocks the rest.
+# Tap ONCE and give the app 8 s to show the photo source sheet. A blind retry would hit the new
+# screen's viewfinder (run 22: Maestro's own retry made one tap last 6.7 s, so the sheet was
+# requested twice). Re-tap only if the sheet is still missing AND Home (home-create) is still shown.
+- tapOn:
+    id: "home-create"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible: "Galeriden seç|Choose from library"
+    timeout: 8000
+    optional: true
+- repeat:
+    times: 2
+    while:
+      notVisible: "Galeriden seç|Choose from library"
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: "home-create"
+          commands:
+            - tapOn:
+                id: "home-create"
+                retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible: "Galeriden seç|Choose from library"
+          timeout: 8000
+          optional: true
+- tapOn:
+    text: "Vazgeç|Cancel"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "pick-photo"
+    timeout: 15000
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}-start
+# Back to a clean Home (no stacked screens) before the tab shots.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- tapOn:
+    id: "tab-library"
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "library-segment"
+    commands:
+      - tapOn:
+          text: "Kitaplık.*|Library.*"
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: "library-segment"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+# The one-time welcome line (account-welcome): keep one screenshot WITH it, then dismiss it
+# (not optional when it is shown) and check that it is gone.
+- extendedWaitUntil:
+    visible:
+      id: "account-welcome"
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: "account-welcome"
+    commands:
+      - takeScreenshot: ${OUT}-library-welcome
+      # Tap 1: by id. Wait 3 s, screenshot. If the line is still there, tap 2: by the visible text
+      # "Kapat", wait 3 s, screenshot. The job stays failing if neither removes it.
+      - tapOn:
+          id: "account-welcome-dismiss"
+      - extendedWaitUntil:
+          visible: "__qa_fixed_wait_never_present__"
+          timeout: 3000
+          optional: true
+      - takeScreenshot: ${OUT}-library-after-dismiss
+      - runFlow:
+          when:
+            visible:
+              id: "account-welcome"
+          commands:
+            - tapOn:
+                text: "Kapat|Close"
+            - extendedWaitUntil:
+                visible: "__qa_fixed_wait_never_present__"
+                timeout: 3000
+                optional: true
+            - takeScreenshot: ${OUT}-library-after-dismiss-text
+      - assertNotVisible:
+          id: "account-welcome"
+# A video exists by now: the Library must show its tile (library-tile), not optional.
+- assertVisible:
+    id: "library-tile"
+- takeScreenshot: ${OUT}-library
+# Video screen: open the tile, screenshot, back.
+- tapOn:
+    id: "library-tile"
+- extendedWaitUntil:
+    visible:
+      id: "video-share"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${OUT}-video-detail
+- tapOn: "Geri|Back"
+- extendedWaitUntil:
+    visible:
+      id: "library-segment"
+    timeout: 15000
+# Long-press menu: screenshot, dismiss with Vazgeç (or a tap outside).
+- longPressOn:
+    id: "library-tile"
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-library-menu
+- tapOn:
+    text: "Vazgeç|Cancel"
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "library-segment"
+    commands:
+      - tapOn:
+          point: "50%, 6%"
+          optional: true
+- tapOn:
+    id: "tab-settings"
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: "settings-language"
+    commands:
+      - tapOn:
+          text: "Ayarlar.*|Settings.*"
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: "settings-language"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: ${OUT}-settings
+- scroll
+- scroll
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-settings-bottom
+# Paywall via the same deep link as qa-paywall.yaml (iOS asks to open: tap Aç).
+- openLink: "vidora://paywall"
+- tapOn:
+    text: "Aç|Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "paywall-close"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "proof-ready"
+    timeout: 20000
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-paywall-proof
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-paywall-top
+- scroll
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: ${OUT}-paywall-plans
+
+# Sample path (the cut-out falls back to a bundled one in the simulator): Home -> "Örnekle dene"
+# -> editor with render-button within 30 s -> screenshot -> back to Home.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "sample-try"
+    timeout: 60000
+# Tap "Örnekle dene" once and give the cut-out 30 s. Never re-tap while the start view is scanning
+# (Home is covered then, so sample-try is not visible): re-tap only if Home is still shown.
+- tapOn:
+    id: "sample-try"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 30000
+    optional: true
+- repeat:
+    times: 2
+    while:
+      notVisible:
+        id: "render-button"
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: "sample-try"
+          commands:
+            - tapOn:
+                id: "sample-try"
+                retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible:
+            id: "render-button"
+          timeout: 30000
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 30000
+- takeScreenshot: ${OUT}-sample-editor
+- tapOn:
+    id: "editor-back"
+    optional: true
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
