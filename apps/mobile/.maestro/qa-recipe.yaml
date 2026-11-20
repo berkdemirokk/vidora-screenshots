@@ -1,0 +1,72 @@
+# Minimal flow: render ONE video with the multi-scene recipe and save it to Photos.
+# Build needs EXPO_PUBLIC_QA_RECIPE=1 (workflow input qa_recipe). No text editing, no template taps
+# (the tool tabs are disabled while a render runs). The paywall is bypassed by the build
+# (EXPO_PUBLIC_SCREENSHOT_MODE=1), exactly as in qa-flow.yaml.
+# Env: OUT (screenshot prefix; default qa-recipe via -e OUT=...). Screenshot names are fixed.
+appId: com.berkdemirok.vidora
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "home-create"
+    timeout: 60000
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn:
+    id: "sample-try"
+    retryTapIfNoChange: false
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 30000
+    optional: true
+- repeat:
+    times: 2
+    while:
+      notVisible:
+        id: "render-button"
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: "sample-try"
+          commands:
+            - tapOn:
+                id: "sample-try"
+                retryTapIfNoChange: false
+      - extendedWaitUntil:
+          visible:
+            id: "render-button"
+          timeout: 30000
+          optional: true
+# Photo prepared, editor ready, preview playing.
+- extendedWaitUntil:
+    visible:
+      id: "render-button"
+    timeout: 120000
+- extendedWaitUntil:
+    visible: "Video önizlemesi|Video preview"
+    timeout: 60000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: qa-recipe-editor
+- tapOn:
+    id: "render-button"
+# Wait up to 15 min for the result screen (save-photos is only on the result).
+- extendedWaitUntil:
+    visible:
+      id: "save-photos"
+    timeout: 900000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: qa-recipe-result
+- tapOn:
+    id: "save-photos"
+- tapOn:
+    text: "İzin Ver|Allow|Tam Erişime İzin Ver|Allow Full Access|Fotoğraf Ekle|Add Photos Only"
+    optional: true
+- extendedWaitUntil:
+    visible: "Kaydedildi|Saved|Fotoğraflar'a kaydedildi|Saved to Photos"
+    timeout: 120000
+- takeScreenshot: qa-recipe-saved
