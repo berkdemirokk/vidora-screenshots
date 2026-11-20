@@ -19,9 +19,21 @@ export type RecipeText = {
   onAccent?: boolean;
 };
 
+/**
+ * Scene colour, resolved from the chosen palette at build time:
+ * accent = strong accent colour (hooks), light = a pale paper tone (hero, end
+ * card), dark = a deep tone (detail), split = a hard two-colour split, paper
+ * on the left 42 % and the accent on the right (price). Applies to cut-out scenes only; texts that
+ * start in the scene take colours that read on it.
+ */
+export type SceneTone = "accent" | "light" | "dark" | "split";
+
 export type RecipeScene = {
   slot: number;
-  mode: "cutout" | "photo";
+  /** "depth" uses the slot's photo (see ProductScene.mode). */
+  mode: "cutout" | "photo" | "depth";
+  /** Cut-out background; default the palette's own background. */
+  tone?: SceneTone;
   /** In beats. */
   length: number;
   keys: ProductKey[];
@@ -54,4 +66,6 @@ export type RecipeInput = {
   palette: PaletteId;
   ratio: FrameRatio;
   quality: ProductQuality;
+  /** Optional music for the render; null or absent means none. */
+  music?: { uri: string; volume: number } | null;
 };

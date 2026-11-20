@@ -1,9 +1,9 @@
 /**
- * AI stüdyo (Vidora Pro): AI Sahne. The cloud (Cloudflare Workers AI, free
- * tier) paints an empty photorealistic scene; the original cut-out product
- * is laid on top on the phone, so the product is never altered and its
- * photo never leaves the device. Motion is added on the phone by the
- * editor's templates (cloud video is off: CLOUD_MOTION_ENABLED).
+ * AI stüdyo (Vidora Pro): AI Sahne. The product (on a plain background,
+ * rendered on the phone from the cut-out) goes to the cloud (Cloudflare
+ * Workers AI, free tier), which answers with a photo of the product in the
+ * chosen scene. Motion is added on the phone by the editor's templates
+ * (cloud video is off: CLOUD_MOTION_ENABLED).
  *
  * Route: /ai-studio?cutout=<file URI>&width=<px>&height=<px>&category=<id>
  * - cutout (required): the PNG from product.cutOut(), cropped to the product.
@@ -26,16 +26,18 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import * as Linking from "expo-linking";
-import { SINGLE_FLOW } from "../src/config";
+import { FEATURES } from "../src/config";
 import {
   AI_PROVIDER,
   CloudError,
-  SCENE_CROP,
+  SCENE_RATIOS,
   VARIANT_CHOICES,
   cloudAvailable,
   cloudErrorText,
+  cropFor,
   discardScenes,
   generateScenes,
+  isModelStyle,
   getQuota,
   offerChosenScene,
   productPlacement,
@@ -44,8 +46,8 @@ import {
   shareScene,
   stylesFor,
   type CloudQuota,
-  type ProductRect,
   type Scene,
+  type SceneRatio,
   type SceneStyleId,
 } from "../src/cloud";
 import { grantAiConsent, hasAiConsent } from "../src/ai-consent";
@@ -69,6 +71,12 @@ import {
 } from "../src/ui";
 
 type Busy = null | "scenes" | "saving";
+
+const RATIO_ASPECT: Record<SceneRatio, number> = {
+  "9:16": 9 / 16,
+  "4:5": 4 / 5,
+  "1:1": 1,
+};
 
 function positive(value: unknown): number {
   const n = Number(value);
@@ -96,8 +104,9 @@ export default function AiStudio() {
     height: positive(params.height),
   });
   const [style, setStyle] = useState<SceneStyleId>(
-    styleOptions[0]?.id ?? "studio-marble",
+    styleOptions[0]?.id ?? "spa-slate",
   );
+  const [ratio, setRatio] = useState<SceneRatio>("9:16");
   const [variants, setVariants] = useState<string>(String(VARIANT_CHOICES[0]));
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [chosen, setChosen] = useState(0);
@@ -152,7 +161,7 @@ export default function AiStudio() {
         toPaywall();
         return;
       }
-      const text = cloudErrorText(error.code);
+      const text = cloudErrorText(error.code, error.resetsAt);
       setMessage(t(text.tr, text.en));
     } else setMessage(describeError(error, t));
   }
@@ -182,7 +191,9 @@ export default function AiStudio() {
     withConsent(() =>
       run("scenes", async () => {
         const result = await generateScenes({
+          product: { uri: cutout, width: size.width, height: size.height },
           style,
+          ratio,
           count: Number(variants),
         });
         if (!mounted.current) {
@@ -192,7 +203,14 @@ export default function AiStudio() {
         discardScenes(sceneList.current);
         setScenes(result.scenes);
         setChosen(0);
-        if (result.quota) setQuota(result.quota);
+        // The headers carry no plan; keep the one shown.
+        const fresh = result.quota;
+        if (fresh) setQuota((old) => ({ ...fresh, plan: old?.plan ?? "pro" }));
+        // A later scene failed: show why next to the scenes that worked.
+        if (result.error) {
+          const text = cloudErrorText(result.error.code, result.error.resetsAt);
+          setMessage(t(text.tr, text.en));
+        }
       }),
     );
 
@@ -204,9 +222,11 @@ export default function AiStudio() {
     kept.current = scene.uri;
     offerChosenScene({
       backgroundUri: scene.uri,
-      crop: SCENE_CROP,
+      crop: cropFor(scene.ratio),
       productRect: rect,
       style: scene.style,
+      // The photo route answers with the product already in the picture.
+      containsProduct: true,
     });
     if (router.canGoBack()) router.back();
     else router.replace("/");
@@ -218,8 +238,8 @@ export default function AiStudio() {
       setMessage(
         saved
           ? t(
-              "Arka plan Fotoğraflar'a kaydedildi.",
-              "Background saved to Photos.",
+              "Görsel Fotoğraflar'a kaydedildi.",
+              "Image saved to Photos.",
             )
           : t(
               "Fotoğraflar'a ekleme izni verilmedi. Ayarlar > Vidora > Fotoğraflar bölümünden izin verebilirsin.",
@@ -236,7 +256,7 @@ export default function AiStudio() {
   // ------------------------------------------------------------- states --
 
   // Without the cloud URL (version 1.0) the feature does not exist: go home.
-  if (SINGLE_FLOW || !cloudAvailable()) return <Redirect href="/" />;
+  if (!FEATURES.aiScene || !cloudAvailable()) return <Redirect href="/" />;
   if (!cutout) {
     const text = cloudErrorText("not-configured");
     return (
@@ -267,8 +287,8 @@ export default function AiStudio() {
         </Txt>
         <Txt muted>
           {t(
-            "AI Sahne ürününü mermer stüdyodan sahile kadar fotoğraf gerçekliğinde sahnelere yerleştirir. Ürünün ve logon hiç değişmez; fotoğrafın telefonundan çıkmaz.",
-            "AI Scene places your product in photorealistic scenes, from a marble studio to the beach. Your product and logo never change, and your photo never leaves your phone.",
+            "AI Sahne ürününü spa taşından sahile kadar fotoğraf gerçekliğinde sahnelere yerleştirir. Ürün fotoğrafın yapay zekâ servisine gönderilir; izni istediğin zaman Ayarlar'dan geri alabilirsin.",
+            "AI Scene places your product in photorealistic scenes, from spa slate to the beach. Your product photo is sent to an AI service; you can take back your permission any time in Settings.",
           )}
         </Txt>
         <Button
@@ -283,7 +303,8 @@ export default function AiStudio() {
   const working = busy !== null;
   const left = quota ? remaining(quota) : null;
   const count = Number(variants);
-  const canMake = !working && (left === null || left >= count);
+  const canMake =
+    !working && size.width > 0 && (left === null || left >= count);
 
   return (
     <Screen
@@ -297,8 +318,8 @@ export default function AiStudio() {
     >
       <Txt muted>
         {t(
-          "Yapay zekâ yalnızca boş sahneyi çizer; ürünün telefonunda, olduğu gibi üstüne yerleştirilir.",
-          "The AI only draws the empty scene; your product is placed on top on your phone, exactly as it is.",
+          "Ürününü seçtiğin sahneye yerleştiren bir fotoğraf üretilir. Sonuç yapay zekâ işidir; ürünün ayrıntılarını kontrol et.",
+          "A photo of your product in the chosen scene is made. The result is AI work; check your product's details.",
         )}
       </Txt>
 
@@ -330,9 +351,18 @@ export default function AiStudio() {
                 accessibilityState={{ selected, disabled: working }}
                 disabled={working}
                 onPress={() => setChosen(index)}
-                style={[local.tile, selected && local.tileSelected]}
+                style={[
+                  local.tile,
+                  { aspectRatio: RATIO_ASPECT[item.ratio] },
+                  selected && local.tileSelected,
+                ]}
               >
-                <Composite background={item.uri} product={cutout} rect={rect} />
+                <Image
+                  accessibilityIgnoresInvertColors
+                  source={{ uri: item.uri }}
+                  resizeMode="cover"
+                  style={StyleSheet.absoluteFill}
+                />
                 {selected && (
                   <View style={local.check}>
                     <Icon name="checkmark" size={13} color={Theme.bg} />
@@ -352,6 +382,16 @@ export default function AiStudio() {
         }))}
         value={style}
         onChange={setStyle}
+        disabled={working}
+      />
+      <Choice
+        label={t("Şekil", "Shape")}
+        options={SCENE_RATIOS.map((item) => ({
+          value: item.id,
+          label: t(item.tr, item.en),
+        }))}
+        value={ratio}
+        onChange={setRatio}
         disabled={working}
       />
       <Choice
@@ -376,7 +416,7 @@ export default function AiStudio() {
           <ActivityIndicator color={Theme.muted} />
           <Text style={s.label}>
             {busy === "scenes"
-              ? t("Sahneler hazırlanıyor (5–20 sn)…", "Making scenes (5–20 s)…")
+              ? t("Sahneler hazırlanıyor (10–40 sn)…", "Making scenes (10–40 s)…")
               : t("Hazırlanıyor…", "Preparing…")}
           </Text>
         </View>
@@ -384,6 +424,15 @@ export default function AiStudio() {
       {!!message && (
         <Text accessibilityLiveRegion="polite" style={[s.text, s.muted]}>
           {message}
+        </Text>
+      )}
+
+      {scene && isModelStyle(scene.style) && (
+        <Text style={s.label}>
+          {t(
+            "Yapay zekâ ürünü yeniden çizer; küçük farklar olabilir.",
+            "AI redraws the product; small differences are possible.",
+          )}
         </Text>
       )}
 
@@ -404,7 +453,7 @@ export default function AiStudio() {
           </Text>
           <View style={local.actions}>
             <Button
-              label={t("Arka planı kaydet", "Save background")}
+              label={t("Görseli kaydet", "Save image")}
               icon="square.and.arrow.down"
               onPress={saveBackground}
               disabled={working}
@@ -437,8 +486,8 @@ export default function AiStudio() {
 
       <Text style={s.label}>
         {t(
-          "Buluta yalnızca seçtiğin sahne stili ve abonelik doğrulaması gider; ürün fotoğrafın gönderilmez.",
-          "Only the scene style you pick and a subscription check go to the cloud; your product photo is not sent.",
+          "Buluta ürün fotoğrafın, seçtiğin sahne stili ve abonelik doğrulaması gider. Fotoğraf sahne üretildikten sonra Vidora'nın sunucusunda saklanmaz.",
+          "Your product photo, the scene style you pick and a subscription check go to the cloud. The photo is not kept on Vidora's server once the scene is made.",
         )}
       </Text>
 
@@ -462,77 +511,6 @@ export default function AiStudio() {
   );
 }
 
-/**
- * Scene with the original cut-out on top. The square background is cropped
- * to its centre 9:16 column (SCENE_CROP); the product sits at `rect`.
- */
-function Composite({
-  background,
-  product,
-  rect,
-}: {
-  background: string;
-  product: string;
-  rect: ProductRect;
-}) {
-  const [frame, setFrame] = useState({ width: 0, height: 0 });
-  const side = frame.height; // square background, as tall as the frame
-  const pw = rect.width * frame.width,
-    ph = rect.height * frame.height;
-  return (
-    <View
-      style={StyleSheet.absoluteFill}
-      onLayout={(e) =>
-        setFrame({
-          width: e.nativeEvent.layout.width,
-          height: e.nativeEvent.layout.height,
-        })
-      }
-    >
-      {frame.width > 0 && (
-        <>
-          <Image
-            accessibilityIgnoresInvertColors
-            source={{ uri: background }}
-            resizeMode="cover"
-            style={{
-              position: "absolute",
-              top: 0,
-              left: -SCENE_CROP.x * side,
-              width: side,
-              height: side,
-            }}
-          />
-          {/* Soft contact shadow so the product sits on the surface. */}
-          <View
-            style={{
-              position: "absolute",
-              left: rect.x * frame.width + pw * 0.12,
-              top: rect.y * frame.height + ph - Math.max(4, ph * 0.04),
-              width: pw * 0.76,
-              height: Math.max(8, ph * 0.08),
-              borderRadius: 999,
-              backgroundColor: Theme.shadowSoft,
-            }}
-          />
-          <Image
-            accessibilityIgnoresInvertColors
-            source={{ uri: product }}
-            resizeMode="contain"
-            style={{
-              position: "absolute",
-              left: rect.x * frame.width,
-              top: rect.y * frame.height,
-              width: pw,
-              height: ph,
-            }}
-          />
-        </>
-      )}
-    </View>
-  );
-}
-
 /** App Review 5.1.2(i): names the provider and what is sent, before the first request. */
 function ConsentSheet({
   visible,
@@ -548,29 +526,29 @@ function ConsentSheet({
     {
       icon: "photo",
       text: t(
-        "Ürün fotoğrafın telefonundan çıkmaz. Yapay zekâ yalnızca boş bir sahne çizer; ürünün telefonunda üstüne yerleştirilir.",
-        "Your product photo never leaves your phone. The AI only draws an empty scene; your product is placed on top on your phone.",
+        "Ürün fotoğrafın (arka planı kaldırılmış, düz zeminli hâli) buluta gönderilir. Yapay zekâ ürünü seçtiğin sahneye yerleştiren yeni bir fotoğraf üretir.",
+        "Your product photo (cut out, on a plain background) is sent to the cloud. The AI makes a new photo that places your product in the scene you chose.",
       ),
     },
     {
       icon: "paperplane",
       text: t(
-        "Gönderilen: seçtiğin sahne stili ve aboneliğini doğrulamak için App Store'un imzaladığı abonelik bilgisi (ürün, işlem numarası, bitiş tarihi). Adın, e-postan veya ödeme bilgin gönderilmez.",
-        "Sent: the scene style you choose and the App Store-signed subscription record used to verify your subscription (product, transaction number, expiry). No name, email or payment details.",
+        "Gönderilen: ürün fotoğrafın, seçtiğin sahne stili ve aboneliğini doğrulamak için App Store'un imzaladığı abonelik bilgisi (ürün, işlem numarası, bitiş tarihi). Adın, e-postan veya ödeme bilgin gönderilmez.",
+        "Sent: your product photo, the scene style you choose and the App Store-signed subscription record used to verify your subscription (product, transaction number, expiry). No name, email or payment details.",
       ),
     },
     {
       icon: "server.rack",
       text: t(
-        `İşleyen: ${AI_PROVIDER}, FLUX.1 [schnell] modeliyle. Vidora'nın sunucusu yalnızca günlük kullanım sayacını tutar (2 gün).`,
-        `Processed by: ${AI_PROVIDER}, with the FLUX.1 [schnell] model. Vidora's server keeps only a daily usage counter (2 days).`,
+        `İşleyen: ${AI_PROVIDER}, FLUX.2 [klein] modeliyle. Vidora'nın sunucusu fotoğrafı saklamaz; yalnızca günlük kullanım sayacını tutar.`,
+        `Processed by: ${AI_PROVIDER}, with the FLUX.2 [klein] model. Vidora's server does not keep the photo; it keeps only a daily usage counter.`,
       ),
     },
     {
       icon: "hand.raised",
       text: t(
-        "Vidora'nın diğer tüm özellikleri telefonunda çalışmaya devam eder. AI Sahne'yi kullanmayı bıraktığında hiçbir şey gönderilmez.",
-        "Every other Vidora feature keeps working on your phone. If you stop using AI Scene, nothing is sent.",
+        "Vidora'nın diğer tüm özellikleri, şablonlar dahil, telefonunda çalışmaya devam eder. AI Sahne'yi kullanmayı bıraktığında hiçbir şey gönderilmez.",
+        "Every other Vidora feature, templates included, keeps working on your phone. If you stop using AI Scene, nothing is sent.",
       ),
     },
   ];
@@ -588,8 +566,8 @@ function ConsentSheet({
           </Txt>
           <Txt muted>
             {t(
-              "Sahneyi telefon değil, üçüncü taraf bir yapay zekâ servisi çizer. Devam etmeden önce neyin paylaşıldığını bil:",
-              "The scene is drawn by a third-party AI service, not your phone. Before you continue, here is what is shared:",
+              "Sahneyi telefon değil, üçüncü taraf bir yapay zekâ servisi üretir. Devam etmeden önce neyin paylaşıldığını bil:",
+              "The scene is made by a third-party AI service, not your phone. Before you continue, here is what is shared:",
             )}
           </Txt>
           {points.map((point) => (

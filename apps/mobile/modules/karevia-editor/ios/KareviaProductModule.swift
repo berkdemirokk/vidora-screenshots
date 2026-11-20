@@ -9,6 +9,9 @@ import Vision
 #if canImport(FoundationModels)
 import FoundationModels
 #endif
+#if canImport(Translation)
+import Translation
+#endif
 
 // Product videos: cut a product out of a photo and render a template video
 // from it entirely on the device. Templates are plain keyframe data built in
@@ -172,6 +175,9 @@ struct ProductBackgroundSpec: Record {
   @Field var imageHeight: Double = 1
   /// 0...1 strength of the top/bottom darkening over the image.
   @Field var shade: Double = 1
+  /// 0 < split < 1: hard two-colour split instead of the gradient; `top` fills
+  /// x < split * width, `bottom` the rest. 0 = the top-to-bottom gradient.
+  @Field var split: Double = 0
 }
 
 struct ProductCameraSpec: Record {
@@ -235,6 +241,9 @@ struct SceneTransitionSpec: Record {
 /// "photo": `image` cover-fills the frame; the keys' scale is a zoom (1 = exact
 /// fill, values below 1 count as 1, at most 1.5) and x/y the photo point
 /// (fractions) put at the frame centre, as far as the photo still covers it.
+/// "depth": the photo split into depth layers (Depth Anything) for a 2.5D
+/// camera move; scale = dolly (1...1.4), x/y = camera offset (-1...1); rotation,
+/// yaw and opacity are ignored. Without depth it is drawn as a photo scene.
 struct ProductSceneSpec: Record {
   init() {}
   @Field var start: Double = 0
@@ -546,6 +555,58 @@ public class KareviaProductModule: Module {
       return ["available": false, "reason": "os"]
     }
 
+    /// Marketplace listing text (title, description, bullets, keywords) from
+    /// Apple's on-device model as raw text; the prompt asks for JSON, parsed in
+    /// TypeScript (src/listing.ts). Throws "product-listing-unavailable" when
+    /// the model or the language cannot be used.
+    AsyncFunction("listingText") { (name: String, category: String, price: String, lang: String) async throws -> String in
+      #if canImport(FoundationModels)
+      if #available(iOS 26.0, *) {
+        return try await ProductCopywriter.listing(name: name, category: category, price: price, lang: lang)
+      }
+      #endif
+      throw ProductCopyErrors.listingUnavailable
+    }
+
+    /// The texts translated on the device (Translation framework, iOS 26
+    /// session without UI), in order. Any failure, including languages that
+    /// are not downloaded yet, throws "product-translate-unavailable".
+    AsyncFunction("translateTexts") { (texts: [String], source: String, target: String) async throws -> [String] in
+      #if canImport(Translation)
+      if #available(iOS 26.0, *) {
+        return try await ProductTranslator.translate(texts, source: source, target: target)
+      }
+      #endif
+      throw ProductCopyErrors.translateUnavailable
+    }
+
+    /// Which languages listing text can be written in ("tr", "en", "de") and
+    /// translated into: {write: [...], translate: [...]}. Translation targets
+    /// are only checked when something can be written.
+    AsyncFunction("textAvailability") { () async -> [String: Any] in
+      var write: [String] = []
+      var translate: [String] = []
+      #if canImport(FoundationModels)
+      if #available(iOS 26.0, *) {
+        write = ProductCopywriter.listingLanguages()
+      }
+      #endif
+      #if canImport(Translation)
+      if #available(iOS 26.0, *) {
+        translate = await ProductTranslator.availableTargets(from: write)
+      }
+      #endif
+      return ["write": write, "translate": translate]
+    }
+
+    /// Puts `text` on the general pasteboard ("Kopyala" in the listing sheet).
+    AsyncFunction("copyText") { (text: String) async throws -> Bool in
+      await MainActor.run {
+        UIPasteboard.general.string = text
+      }
+      return true
+    }
+
     /// One frame of the video as a JPEG, for previews. Runs on the preview
     /// queue; a newer preview request or a render makes it fail with
     /// "product-preview-stale".
@@ -676,6 +737,147 @@ private enum ProductCopywriter {
     let session = LanguageModelSession(instructions: instructions)
     let response = try await session.respond(to: prompt)
     return ["available": true, "text": response.content]
+  }
+
+  /// Listing languages the model can write in now, in a fixed order; empty
+  /// when the model cannot run (not eligible, turned off, downloading).
+  static func listingLanguages() -> [String] {
+    let model = SystemLanguageModel.default
+    guard case .available = model.availability else { return [] }
+    return ["tr", "en", "de"].filter { code in
+      model.supportedLanguages.contains(where: { $0.languageCode?.identifier == code })
+    }
+  }
+
+  /// Raw model text for a marketplace listing; the prompt asks for one JSON object.
+  static func listing(name: String, category: String, price: String, lang: String) async throws -> String {
+    let model = SystemLanguageModel.default
+    guard case .available = model.availability else { throw ProductCopyErrors.listingUnavailable }
+    let code = ["tr", "en", "de"].contains(lang) ? lang : "en"
+    guard model.supportedLanguages.contains(where: { $0.languageCode?.identifier == code }) else {
+      throw ProductCopyErrors.listingUnavailable
+    }
+    let product = String(name.prefix(80))
+    let kind = String(category.prefix(40))
+    let cost = String(price.prefix(30))
+    let language: String
+    let locale: String
+    if code == "tr" {
+      language = "Turkish"
+      locale = "tr_TR"
+    } else if code == "de" {
+      language = "German"
+      locale = "de_DE"
+    } else {
+      language = "English"
+      locale = "en_US"
+    }
+    let instructions = """
+      You write product listings for online marketplaces. The person's locale is \(locale). \
+      You MUST respond in \(language). Write plain, natural, understated text. \
+      Never invent unverifiable claims such as health benefits, discounts, warranties or certifications. \
+      Never invent materials, sizes or features that are not given. No emoji. \
+      Answer with one JSON object only, no other text.
+      """
+    let prompt = """
+      Product: \(product.isEmpty ? "not given" : product)
+      Category: \(kind)
+      Price: \(cost.isEmpty ? "not given" : cost)
+      Write a marketplace listing in \(language) as one JSON object with exactly these keys:
+      "title": a product title of at most 90 characters,
+      "description": 2 or 3 short sentences,
+      "bullets": an array of 3 to 5 short feature lines,
+      "keywords": an array of 8 to 15 search keywords.
+      Do not mention the price unless it is given.
+      """
+    let session = LanguageModelSession(instructions: instructions)
+    let response = try await session.respond(to: prompt)
+    return response.content
+  }
+}
+#endif
+
+/// Coded errors of the listing text and translation functions, usable on every iOS version.
+private enum ProductCopyErrors {
+  static let listingUnavailable = ProductFailure.coded(
+    "product-listing-unavailable", "Listing text is not available on this device.")
+  static let translateUnavailable = ProductFailure.coded(
+    "product-translate-unavailable", "Translation is not available on this device right now.")
+}
+
+// MARK: - On-device translation
+
+#if canImport(Translation)
+@available(iOS 26.0, *)
+private enum ProductTranslator {
+  /// Languages a listing can be translated into.
+  static let targetCodes = ["en", "de", "fr", "es", "ar", "ru"]
+  /// Source languages (the listing's own language).
+  static let sourceCodes = ["tr", "en", "de"]
+  static let maxTexts = 40
+  static let maxLength = 4000
+
+  /// True only for a pair that is installed: the session without UI cannot
+  /// download languages, so ".supported" (downloadable) would always fail.
+  static func usable(_ status: LanguageAvailability.Status) -> Bool {
+    switch status {
+    case .installed:
+      return true
+    default:
+      return false
+    }
+  }
+
+  /// Targets that every one of `sources` can be translated into; empty when
+  /// there is no source. Main actor: the framework's isolation is not relied on.
+  @MainActor
+  static func availableTargets(from sources: [String]) async -> [String] {
+    guard !sources.isEmpty else { return [] }
+    let availability = LanguageAvailability()
+    var result: [String] = []
+    for target in targetCodes {
+      var ok = true
+      for source in sources where source != target {
+        let status = await availability.status(
+          from: Locale.Language(identifier: source), to: Locale.Language(identifier: target))
+        if !usable(status) {
+          ok = false
+          break
+        }
+      }
+      if ok { result.append(target) }
+    }
+    return result
+  }
+
+  /// `texts` translated from `source` into `target`, in order; empty texts stay empty.
+  /// Main actor: creating and using the session never depends on its isolation.
+  @MainActor
+  static func translate(_ texts: [String], source: String, target: String) async throws -> [String] {
+    guard sourceCodes.contains(source), targetCodes.contains(target), source != target,
+          texts.count <= maxTexts else {
+      throw ProductCopyErrors.translateUnavailable
+    }
+    var output: [String] = []
+    output.reserveCapacity(texts.count)
+    do {
+      // `try` keeps this compiling should the initialiser ever throw (otherwise only a warning).
+      let session = try TranslationSession(
+        installedSource: Locale.Language(identifier: source), target: Locale.Language(identifier: target))
+      for text in texts {
+        let trimmed = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxLength))
+        if trimmed.isEmpty {
+          output.append("")
+          continue
+        }
+        let response = try await session.translate(trimmed)
+        output.append(response.targetText)
+      }
+    } catch {
+      NSLog("[VidoraTranslate] translation failed: %@", String(describing: error))
+      throw ProductCopyErrors.translateUnavailable
+    }
+    return output
   }
 }
 #endif
@@ -1032,6 +1234,8 @@ private enum ProductCutout {
 private final class DepthField {
   let width: Int
   let height: Int
+  /// The relative depth itself (0 = farthest, 1 = nearest), rows top to bottom.
+  let depth: [Float]
   private let alpha: [Float]
   private let nx: [Float]
   private let ny: [Float]
@@ -1040,6 +1244,7 @@ private final class DepthField {
   init(width: Int, height: Int, depth: [Float], alpha: [Float]) {
     self.width = width
     self.height = height
+    self.depth = depth
     self.alpha = alpha
     var nx = [Float](repeating: 0, count: depth.count)
     var ny = nx
@@ -1132,7 +1337,7 @@ private enum ProductDepth {
     lock.unlock()
     guard let model = loadModel(), let field = estimate(product, model: model) else { return nil }
     lock.lock()
-    if cache.count > 8 { cache.removeAll() }
+    if cache.count >= 16 { cache.removeAll() }
     cache[key] = field
     lock.unlock()
     return field
@@ -1461,6 +1666,11 @@ private struct PreparedScenes {
   let prepared: [PreparedScene?]
   /// The photo decoded at frame size; nil for cut-out scenes.
   let photos: [CGImage?]
+  /// Depth scenes: feathered masks of the nearer depth layers (far to near);
+  /// nil for other scenes and for a depth scene without depth (drawn as a photo).
+  let depthMasks: [[CGImage]?]
+  /// A depth scene without depth: the photo-scene keys it is drawn with; nil otherwise.
+  let photoKeys: [[ProductKeySpec]?]
   /// Drawn once per frame over whichever scenes are showing.
   let texts: [PreparedText]
   let watermark: PreparedText?
@@ -2121,8 +2331,15 @@ private enum ProductRenderer {
       }
       return
     }
-    // CoreGraphics origin is bottom-left: "top" colour goes at maxY.
-    if let gradient = CGGradient(colorsSpace: space, colors: [color(bg.bottom), color(bg.top)] as CFArray, locations: [0, 1]) {
+    if bg.split.isFinite && bg.split > 0 && bg.split < 1 {
+      // Hard two-colour split, no gradient: "top" left of the edge, "bottom" right of it.
+      let edge = (size.width * CGFloat(bg.split)).rounded()
+      ctx.setFillColor(color(bg.bottom))
+      ctx.fill(CGRect(x: 0, y: 0, width: size.width, height: size.height))
+      ctx.setFillColor(color(bg.top))
+      ctx.fill(CGRect(x: 0, y: 0, width: edge, height: size.height))
+    } else if let gradient = CGGradient(colorsSpace: space, colors: [color(bg.bottom), color(bg.top)] as CFArray, locations: [0, 1]) {
+      // CoreGraphics origin is bottom-left: "top" colour goes at maxY.
       ctx.drawLinearGradient(gradient, start: .zero, end: CGPoint(x: 0, y: size.height), options: [])
     }
     if bg.floor {
@@ -2591,11 +2808,143 @@ private enum ProductRenderer {
     ctx.restoreGState()
   }
 
+  /// Depth at which the nearer layers begin (0 = farthest, 1 = nearest); the
+  /// far layer is the whole photo, so it fills whatever a nearer layer uncovers.
+  static let depthThresholds: [Float] = [0.25, 0.5, 0.75]
+  /// Width of the soft edge of a depth layer, in depth units.
+  static let depthFeather: Float = 0.12
+
+  /// A depth scene: the photo as 4 depth layers drawn far to near, each moved
+  /// by the camera. Keys: scale = dolly (1...1.4), x/y = camera offset
+  /// (-1...1, y down); near layers move and grow more than far ones. No keys =
+  /// camera at rest. Then black at `shade` opacity, as in a photo scene.
+  static func drawDepthScene(ctx: CGContext, t: Double, image: CGImage, masks: [CGImage], keys: [ProductKeySpec], shade: Double, size: CGSize) {
+    let W = size.width, H = size.height
+    var orbitX: CGFloat = 0
+    var orbitY: CGFloat = 0
+    var dolly: CGFloat = 1
+    if !keys.isEmpty {
+      let pose = ProductRenderer.pose(at: t, keys: keys)
+      orbitX = CGFloat(pose.x.isFinite ? max(-1, min(1, pose.x)) : 0)
+      orbitY = CGFloat(pose.y.isFinite ? max(-1, min(1, pose.y)) : 0)
+      dolly = CGFloat(pose.scale.isFinite ? max(1, min(1.4, pose.scale)) : 1)
+    }
+    let iw = CGFloat(max(1, image.width)), ih = CGFloat(max(1, image.height))
+    // Cover-fill plus 6 % overscan: the far layer still covers the frame when it shifts.
+    let fill = max(W / iw, H / ih) * 1.06
+    let travel = W * 0.035
+    let layerCount = masks.count + 1
+    // Flip to top-left origin, as drawPhotoScene does.
+    ctx.saveGState()
+    ctx.translateBy(x: 0, y: H)
+    ctx.scaleBy(x: 1, y: -1)
+    ctx.setFillColor(color("#000000"))
+    ctx.fill(CGRect(origin: .zero, size: size))
+    for layer in 0..<layerCount {
+      // 0 = far ... 1 = near.
+      let near = CGFloat(layer) / CGFloat(max(1, layerCount - 1))
+      let grow = 1 + (dolly - 1) * (0.5 + 0.5 * near)
+      let w = iw * fill * grow
+      let h = ih * fill * grow
+      // The camera moves by (x, y): near layers shift against it, the far layer slightly with it.
+      let lean = (near - 0.25) * travel
+      let x0 = (W - w) / 2 - orbitX * lean
+      let y0 = (H - h) / 2 - orbitY * lean
+      let rect = CGRect(x: x0, y: y0, width: w, height: h)
+      if layer == 0 {
+        draw(image, in: rect, ctx: ctx)
+      } else {
+        // Same flip as `draw`, so the mask lines up with the photo.
+        ctx.saveGState()
+        ctx.translateBy(x: rect.minX, y: rect.maxY)
+        ctx.scaleBy(x: 1, y: -1)
+        let local = CGRect(origin: .zero, size: rect.size)
+        ctx.clip(to: local, mask: masks[layer - 1])
+        ctx.draw(image, in: local)
+        ctx.restoreGState()
+      }
+    }
+    let strength = CGFloat(shade.isFinite ? max(0, min(1, shade)) : 0)
+    if strength > 0.001 {
+      ctx.setFillColor(color("#000000", alpha: strength))
+      ctx.fill(CGRect(origin: .zero, size: size))
+    }
+    ctx.restoreGState()
+  }
+
+  /// Feathered grey masks (white = drawn) of the nearer depth layers, one per
+  /// threshold, at 3x the depth grid. Nil if the grid is unusable.
+  static func depthMasks(_ field: DepthField) -> [CGImage]? {
+    let gw = field.width, gh = field.height
+    let source = field.depth
+    guard gw > 1, gh > 1, source.count == gw * gh else { return nil }
+    let up = 3
+    let mw = gw * up, mh = gh * up
+    // Depth resampled (bilinear) at mask size once, then thresholded per layer.
+    var values = [Float](repeating: 0, count: mw * mh)
+    for my in 0..<mh {
+      let sy = max(0, min(Float(gh - 1), (Float(my) + 0.5) / Float(up) - 0.5))
+      let y0 = Int(sy)
+      let y1 = min(gh - 1, y0 + 1)
+      let fy = sy - Float(y0)
+      for mx in 0..<mw {
+        let sx = max(0, min(Float(gw - 1), (Float(mx) + 0.5) / Float(up) - 0.5))
+        let x0 = Int(sx)
+        let x1 = min(gw - 1, x0 + 1)
+        let fx = sx - Float(x0)
+        let a = source[y0 * gw + x0], b = source[y0 * gw + x1]
+        let c = source[y1 * gw + x0], d = source[y1 * gw + x1]
+        let top = a + (b - a) * fx
+        let bottom = c + (d - c) * fx
+        values[my * mw + mx] = top + (bottom - top) * fy
+      }
+    }
+    var masks: [CGImage] = []
+    for threshold in depthThresholds {
+      var pixels = [UInt8](repeating: 0, count: mw * mh)
+      for i in 0..<(mw * mh) {
+        let u = max(0, min(1, (values[i] - threshold) / depthFeather + 0.5))
+        let soft = u * u * (3 - 2 * u)
+        pixels[i] = UInt8(max(0, min(255, soft * 255)))
+      }
+      guard let provider = CGDataProvider(data: Data(pixels) as CFData),
+            let mask = CGImage(
+              width: mw, height: mh, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: mw,
+              space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+              provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+      else { return nil }
+      masks.append(mask)
+    }
+    return masks
+  }
+
+  /// Keys for a depth scene drawn as a photo scene (no depth): the dolly
+  /// becomes the zoom, the camera offset a small pan around the centre.
+  /// New records, because copies of a record share their fields.
+  static func photoKeys(fromDepth keys: [ProductKeySpec]) -> [ProductKeySpec] {
+    return keys.map { (key: ProductKeySpec) -> ProductKeySpec in
+      var out = ProductKeySpec()
+      let x = key.x.isFinite ? max(-1, min(1, key.x)) : 0
+      let y = key.y.isFinite ? max(-1, min(1, key.y)) : 0
+      out.t = key.t
+      out.x = 0.5 + 0.08 * x
+      out.y = 0.5 + 0.08 * y
+      out.scale = key.scale.isFinite ? max(1, min(1.4, key.scale)) : 1
+      out.ease = key.ease
+      return out
+    }
+  }
+
   /// Scene `index` at its own local time `t`, without the global texts.
   static func drawScene(ctx: CGContext, index: Int, t: Double, video: PreparedScenes) {
     let scene = video.scenes[index]
     if let photo = video.photos[index] {
-      drawPhotoScene(ctx: ctx, t: t, image: photo, keys: scene.keys, shade: scene.shade, size: video.size)
+      if let masks = video.depthMasks[index] {
+        drawDepthScene(ctx: ctx, t: t, image: photo, masks: masks, keys: scene.keys, shade: scene.shade, size: video.size)
+      } else {
+        let keys = video.photoKeys[index] ?? scene.keys
+        drawPhotoScene(ctx: ctx, t: t, image: photo, keys: keys, shade: scene.shade, size: video.size)
+      }
     } else if let prepared = video.prepared[index], let cutoutSpec = video.specs[index] {
       drawFrame(ctx: ctx, t: t, spec: cutoutSpec, scene: prepared)
     }
@@ -2818,7 +3167,7 @@ private enum ProductRenderer {
   static func cutoutKey(_ s: ProductVideoSpec) -> String {
     let bg = s.background
     var parts: [String] = [s.product, bg.top, bg.bottom, bg.glow, bg.floor ? "floor" : "flat", bg.image]
-    parts.append("\(bg.imageX),\(bg.imageWidth),\(bg.imageY),\(bg.imageHeight),\(bg.shade)")
+    parts.append("\(bg.imageX),\(bg.imageWidth),\(bg.imageY),\(bg.imageHeight),\(bg.shade),\(bg.split)")
     for key in s.keys { parts.append("\(key.x),\(key.y),\(key.scale)") }
     for shot in s.shots { parts.append("\(shot.zoom)") }
     return parts.joined(separator: "|")
@@ -2836,8 +3185,9 @@ private enum ProductRenderer {
     }
     var lastStart = -1.0
     for scene in scenes {
+      let knownMode = scene.mode == "cutout" || scene.mode == "photo" || scene.mode == "depth"
       guard scene.start.isFinite, scene.start > lastStart, scene.transition.duration.isFinite,
-            scene.shade.isFinite, scene.mode == "cutout" || scene.mode == "photo" else {
+            scene.shade.isFinite, knownMode else {
         throw ProductFailure.invalid("A scene in the template is invalid.")
       }
       lastStart = scene.start
@@ -2849,9 +3199,15 @@ private enum ProductRenderer {
     var specs: [ProductVideoSpec?] = []
     var prepared: [PreparedScene?] = []
     var photos: [CGImage?] = []
+    // Depth scenes: masks per image, images without usable depth, one log line per render.
+    var depthCache: [String: [CGImage]] = [:]
+    var noDepth = Set<String>()
+    var loggedNoDepth = false
+    var depthMasksList: [[CGImage]?] = []
+    var photoKeysList: [[ProductKeySpec]?] = []
     for scene in scenes {
       guard let url = try? fileURL(scene.image), ProductImages.pixelSize(url) != nil else { throw missing }
-      if scene.mode == "photo" {
+      if scene.mode == "photo" || scene.mode == "depth" {
         let photo: CGImage
         if let hit = photoCache[scene.image] {
           photo = hit
@@ -2860,9 +3216,39 @@ private enum ProductRenderer {
           photoCache[scene.image] = decoded
           photo = decoded
         }
+        var masks: [CGImage]? = nil
+        if scene.mode == "depth" {
+          if let hit = depthCache[scene.image] {
+            masks = hit
+          } else if !noDepth.contains(scene.image) {
+            // The model runs once per image (ProductDepth also caches it across renders);
+            // its buffers are freed before the next scene. Never fails the render.
+            let depthKey = "scene-depth|" + url.path
+            let made: [CGImage]? = autoreleasepool { () -> [CGImage]? in
+              guard let field = ProductDepth.field(for: photo, key: depthKey) else { return nil }
+              return depthMasks(field)
+            }
+            if let made {
+              depthCache[scene.image] = made
+              masks = made
+            } else {
+              noDepth.insert(scene.image)
+            }
+          }
+          if masks == nil && !loggedNoDepth {
+            loggedNoDepth = true
+            NSLog("[VidoraDepth] depth scene without depth: drawn as a photo")
+          }
+        }
         specs.append(nil)
         prepared.append(nil)
         photos.append(photo)
+        depthMasksList.append(masks)
+        if scene.mode == "depth" && masks == nil {
+          photoKeysList.append(photoKeys(fromDepth: scene.keys))
+        } else {
+          photoKeysList.append(nil)
+        }
         continue
       }
       // Global sweeps keep their video time: shifted into the scene's local time.
@@ -2909,6 +3295,8 @@ private enum ProductRenderer {
       specs.append(sceneSpec(spec, scene: scene, sweeps: shifted))
       prepared.append(ready)
       photos.append(nil)
+      depthMasksList.append(nil)
+      photoKeysList.append(nil)
     }
     let finish = ProductFinish(spec.look)
     var vignette: CGGradient?
@@ -2924,6 +3312,8 @@ private enum ProductRenderer {
       specs: specs,
       prepared: prepared,
       photos: photos,
+      depthMasks: depthMasksList,
+      photoKeys: photoKeysList,
       texts: spec.texts.compactMap { textImage($0, frame: size) },
       watermark: spec.watermark ? watermarkImage(frame: size) : nil,
       vignette: vignette)

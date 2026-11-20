@@ -89,3 +89,14 @@ test("invalid scene mode, keys and shade are problems", () => {
     assert.ok(p.some((x) => x.includes(word)), word + ": " + p.join());
   }
 });
+
+test("depth mode is a valid scene mode", () => {
+  const depthKeys = [
+    { t: 0, x: -0.6, y: 0, scale: 1, rotation: 0, opacity: 1, yaw: 0, ease: "inOut" },
+    { t: 3, x: 0.6, y: 0.2, scale: 1.3, rotation: 0, opacity: 1, yaw: 0, ease: "inOut" },
+  ];
+  const spec = withScenes([scene(0), scene(3, { mode: "depth", keys: depthKeys })]);
+  assert.deepEqual(specProblems(spec), []);
+  const p = specProblems(withScenes([scene(0), scene(3, { mode: "depths" })]));
+  assert.ok(p.some((x) => x.includes("mode")), p.join());
+});

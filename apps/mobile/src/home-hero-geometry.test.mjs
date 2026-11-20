@@ -202,18 +202,18 @@ test("first-paint photo: nothing known gives an empty frame, no NaN", () => {
   }
 });
 
-test("Home wires it: layer hidden until the sheet is measured, ids kept", () => {
+// Since the template gallery (rakipleri-gecme task 5, fix round 1) Home uses
+// the compact hero (src/gallery.ts compactHeroLayout, tested in
+// gallery.test.mjs); the full-bleed geometry above is no longer wired in.
+test("Home keeps the hero's ids in the compact hero", () => {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(
     path.join(here, "..", "app", "(tabs)", "(studio)", "index.tsx"),
     "utf8",
   );
-  assert.match(source, /heroOffset\(geometry\)/);
-  assert.match(source, /opacity: revealed \? 1 : 0/);
-  assert.match(source, /sheetPaddingBottom\(window\.height, tabInset\)/);
-  assert.match(source, /top: -offset/);
-  assert.match(source, /onLayout=\{/);
+  assert.match(source, /compactHeroLayout\(\{/);
   for (const id of [
+    "sample-try",
     "home-create",
     "home-sample",
     "home-resume-draft",

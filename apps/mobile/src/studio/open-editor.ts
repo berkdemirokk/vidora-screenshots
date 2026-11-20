@@ -24,10 +24,15 @@ export function openEditor(
     draft?: { id: string; sourceClip: string | null };
     edit?: string;
     duplicate?: string;
-    /** For a new video (Home's intent tiles): template, ratio, goal. */
-    start?: { template?: string; ratio?: string; goal?: string };
+    /**
+     * For a new video: template, ratio, goal (Home's intent tiles) or a
+     * gallery variant (Home's template gallery).
+     */
+    start?: { template?: string; ratio?: string; goal?: string; variant?: string };
     /** Open the photo source sheet at once (Home's "Fotoğraf seç"). */
     pick?: boolean;
+    /** Photos already picked on Home (gallery card): photo 1 first. */
+    photos?: string[];
   },
   mode: "push" | "replace" = "push",
 ): void {
@@ -45,8 +50,11 @@ export function openEditor(
   if (!target.draft && !target.edit && !target.duplicate && target.start)
     for (const [key, value] of Object.entries(target.start))
       if (value) params[key] = value;
-  if (target.pick && !target.draft && !target.edit && !target.duplicate)
-    params.pick = "1";
+  const fresh = !target.draft && !target.edit && !target.duplicate;
+  if (target.pick && fresh) params.pick = "1";
+  // A JSON list of local file URIs; create.tsx validates it (parsePhotosParam).
+  if (target.photos && target.photos.length > 0 && fresh)
+    params.photos = JSON.stringify(target.photos);
   const href = { pathname: "/create" as const, params };
   const options = session ? { dangerouslySingular: singularEditor } : undefined;
   if (mode === "replace") router.replace(href, options);

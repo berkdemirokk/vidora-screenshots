@@ -148,10 +148,20 @@ export function autosaveDelay(pendingSince: number, now: number): number {
 
 /** One plain sentence when a draft's music or own photo is gone (finding 8). */
 export function missingFilesNote(
-  missing: { music: boolean; backdrop: boolean },
+  missing: { music: boolean; backdrop: boolean; photos?: boolean },
   lang: Lang,
 ): string | null {
   const t = (tr: string, en: string) => translate(lang, tr, en);
+  if (missing.photos)
+    return missing.music || missing.backdrop
+      ? t(
+          "Bu çalışmanın bazı dosyaları bulunamadı; kalanlarla açıldı.",
+          "Some of this work's files were not found; it opened with the rest.",
+        )
+      : t(
+          "Bu çalışmanın bazı fotoğrafları bulunamadı; kalan fotoğraflarla açıldı.",
+          "Some of this work's photos were not found; it opened with the remaining photos.",
+        );
   if (missing.music && missing.backdrop)
     return t(
       "Bu çalışmanın müziği ve arka plan fotoğrafı bulunamadı; onlarsız açıldı.",

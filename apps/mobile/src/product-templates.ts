@@ -211,6 +211,12 @@ export type ProductBackground = {
   imageHeight?: number;
   /** 0...1 strength of the top/bottom darkening over a scene image; default 1. */
   shade?: number;
+  /**
+   * 0 < split < 1 (fraction of the frame width): a hard two-colour split
+   * instead of the gradient, `top` left of the edge and `bottom` right of it;
+   * glow and floor still drawn on top. Absent or 0 = the gradient.
+   */
+  split?: number;
 };
 
 /** A scene image and where the product stands in the 9:16 frame (fractions). */
@@ -225,6 +231,11 @@ export type SceneInput = {
   productRect: { x: number; y: number; width: number; height: number };
   /** 0...1 strength of the darkening over the image; default 1 (0 for bundled backdrops). */
   shade?: number;
+  /**
+   * True when the image already shows the product (AI Sahne's photo route):
+   * the editor must never draw the cut-out over it (src/editor-media.ts).
+   */
+  containsProduct?: boolean;
 };
 
 export type SceneTransition = {
@@ -237,8 +248,13 @@ export type ProductScene = {
   start: number;
   /** File uri. */
   image: string;
-  /** cutout: drawn like the single-product spec; photo: cover-fills the frame. */
-  mode: "cutout" | "photo";
+  /**
+   * cutout: drawn like the single-product spec; photo: cover-fills the frame;
+   * depth: the photo split into depth layers for a 2.5D camera move (keys:
+   * scale = dolly 1...1.4, x/y = camera offset -1...1; rotation, yaw and
+   * opacity ignored). Falls back to a still photo when depth is unavailable.
+   */
+  mode: "cutout" | "photo" | "depth";
   /** Times relative to the scene start. */
   keys: ProductKey[];
   /** Cutout mode only; default spec.background. */
@@ -2748,6 +2764,7 @@ export function specProblems(spec: ProductVideoSpec): string[] {
     (bg.shade !== undefined && (!fin(bg.shade) || bg.shade < 0 || bg.shade > 1))
   )
     out.push("background image");
+  if (splitBad(bg.split)) out.push("background split");
   if (spec.ratio !== undefined && !ALL_RATIOS.includes(spec.ratio))
     out.push("ratio");
   const shots = spec.shots ?? [];
@@ -2843,7 +2860,8 @@ function sceneProblems(scenes: ProductScene[], duration: number): string[] {
     else if (i === 0 ? sc.start !== 0 : sc.start <= scenes[i - 1].start)
       out.push("scenes order " + i);
     if (!sc.image) out.push(n + " image");
-    if (sc.mode !== "cutout" && sc.mode !== "photo") out.push(n + " mode");
+    if (sc.mode !== "cutout" && sc.mode !== "photo" && sc.mode !== "depth")
+      out.push(n + " mode");
     if (!Array.isArray(sc.keys)) out.push(n + " keys");
     if (
       !["cut", "push", "wipe", "zoom"].includes(sc.transition?.kind) ||
@@ -2854,8 +2872,14 @@ function sceneProblems(scenes: ProductScene[], duration: number): string[] {
       out.push(n + " transition");
     if (sc.shade !== undefined && (!fin(sc.shade) || sc.shade < 0 || sc.shade > 1))
       out.push(n + " shade");
+    if (splitBad(sc.background?.split)) out.push(n + " background split");
   });
   return out;
+}
+
+/** A background split outside 0 <= split < 1 (absent is fine). */
+function splitBad(s: number | undefined): boolean {
+  return s !== undefined && (!fin(s) || s < 0 || s >= 1);
 }
 
 // MARK: Poster moment

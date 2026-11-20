@@ -32,6 +32,7 @@ const TABLE: [RegExp, string | ((m: RegExpMatchArray) => string)][] = [
     "Başka bir ürün videosu hazırlanıyor.",
   ],
   [/The product video was cancelled/, "Ürün videosu iptal edildi."],
+  [/product-translate-unavailable/, "Çeviri bu cihazda şu an kullanılamıyor."],
   [
     /The video length must be between 8 and 30 seconds/,
     "Video süresi 8 ile 30 saniye arasında olmalı.",
@@ -143,6 +144,10 @@ const ENGLISH: [RegExp, string][] = [
     "Another product video is being rendered.",
   ],
   [/The product video was cancelled/, "The product video was cancelled."],
+  [
+    /product-translate-unavailable/,
+    "Translation isn't available on this device right now.",
+  ],
   [
     /The video length must be between 8 and 30 seconds/,
     "The video must be between 8 and 30 seconds long.",

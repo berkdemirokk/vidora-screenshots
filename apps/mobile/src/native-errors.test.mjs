@@ -166,3 +166,16 @@ test("a desk export stopped by going to the background has its own message", () 
     "The export stopped because the app went to the background. Try again.",
   );
 });
+
+test("translation that cannot run on the device has a clear message", () => {
+  const wrapped =
+    "Calling the 'translateTexts' function has failed\n→ Caused by: product-translate-unavailable: Translation is not available on this device right now.";
+  assert.equal(
+    nativeErrorTurkish(wrapped),
+    "Çeviri bu cihazda şu an kullanılamıyor.",
+  );
+  assert.equal(
+    nativeErrorEnglish(wrapped),
+    "Translation isn't available on this device right now.",
+  );
+});

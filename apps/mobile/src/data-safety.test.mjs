@@ -434,3 +434,109 @@ test("coordinator 5: listSync matches list and the library version moves", async
   store.saveDraft(meta(), state(), cutout());
   assert.ok(media.libraryVersion() > before);
 });
+
+// ---------------------------------------------------------------- several photos
+test("extra photos are stored with the draft and a deleted one is dropped", () => {
+  fresh();
+  const photo = (n) => {
+    const uri = `file:///cache/ImagePicker/p${n}.jpg`;
+    fs.files.set(uri, "jpg-" + n);
+    return uri;
+  };
+  const extras = [
+    { source: photo(1), cutout: cutout(), width: 600, height: 900 },
+    { source: photo(2) },
+    { source: photo(3), cutout: cutout(), width: 500, height: 500 },
+  ];
+  store.saveDraft(meta(), state({ extraPhotos: extras }), cutout());
+  for (const name of [`${ID}.x1.jpg`, `${ID}.x1c.png`, `${ID}.x2.jpg`, `${ID}.x3.jpg`])
+    assert.ok(exists("drafts/" + name), name);
+  const opened = store.loadDraft(ID);
+  assert.equal(opened.photosMissing, false);
+  assert.equal(opened.draft.extraPhotos.length, 3);
+  assert.ok(opened.draft.extraPhotos.every((p) => p.source.startsWith("file:///cache/")));
+  assert.equal(fs.files.get(opened.draft.extraPhotos[1].source), "jpg-2");
+  assert.equal(opened.draft.extraPhotos[1].cutout, undefined);
+  // Photo 2 deleted meanwhile: the draft opens with photos 1 and 3.
+  fs.files.delete(`${MEDIA}/drafts/${ID}.x2.jpg`);
+  const again = store.loadDraft(ID);
+  assert.equal(again.photosMissing, true);
+  assert.deepEqual(
+    again.draft.extraPhotos.map((p) => fs.files.get(p.source)),
+    ["jpg-1", "jpg-3"],
+  );
+  // Saving with one photo less removes the files it no longer names.
+  store.saveDraft(meta(), state({ extraPhotos: [again.draft.extraPhotos[0]] }), opened.cutoutUri);
+  assert.ok(exists(`drafts/${ID}.x1.jpg`));
+  assert.equal(exists(`drafts/${ID}.x3.jpg`), false);
+  assert.equal(exists(`drafts/${ID}.x3c.png`), false);
+  // A one-photo draft has no extra files and no extraPhotos field.
+  store.saveDraft(meta(), state(), opened.cutoutUri);
+  assert.equal(exists(`drafts/${ID}.x1.jpg`), false);
+  assert.equal(store.loadDraft(ID).draft.extraPhotos, undefined);
+});
+
+test("a full disk while copying an extra photo fails the save and keeps the stored copy", () => {
+  fresh();
+  const pick = (n) => {
+    const uri = `file:///cache/ImagePicker/q${n}.jpg`;
+    fs.files.set(uri, "jpg-" + n);
+    return uri;
+  };
+  const cut = cutout();
+  store.saveDraft(meta(), state({ headline: "Bir", extraPhotos: [{ source: pick(1) }] }), cut);
+  assert.ok(exists(`drafts/${ID}.x1.jpg`));
+  // A new photo 2 replaces photo 1; the copy hits a full disk.
+  fs.fail = (op, uri) => op === "copy" && uri.includes(`${ID}.x1.jpg`);
+  assert.throws(() =>
+    store.saveDraft(meta(), state({ headline: "İki", extraPhotos: [{ source: pick(2) }] }), cut),
+  );
+  fs.fail = null;
+  assert.equal(fs.files.get(`${MEDIA}/drafts/${ID}.x1.jpg`), "jpg-1", "stored copy kept");
+  const opened = store.loadDraft(ID);
+  assert.equal(opened.draft.headline, "Bir", "the old draft is intact");
+  assert.equal(opened.draft.extraPhotos.length, 1);
+  assert.equal(opened.photosMissing, false);
+  // A picked file that is really gone is only left out.
+  const gone = pick(3);
+  fs.files.delete(gone);
+  store.saveDraft(meta(), state({ headline: "Üç", extraPhotos: [{ source: gone }] }), cut);
+  assert.equal(store.loadDraft(ID).draft.extraPhotos, undefined);
+});
+
+test("photo 1's original photo is stored with the draft and comes back", () => {
+  fresh();
+  const original = "file:///cache/ImagePicker/main.heic";
+  fs.files.set(original, "heic-main");
+  store.saveDraft(
+    meta(),
+    state({ variant: "indirim-1", photo: original }),
+    cutout(),
+  );
+  assert.ok(exists(`drafts/${ID}.p.heic`));
+  const opened = store.loadDraft(ID);
+  assert.equal(opened.draft.variant, "indirim-1");
+  assert.ok(opened.draft.photo.startsWith("file:///cache/vidora-photo-"));
+  assert.equal(fs.files.get(opened.draft.photo), "heic-main");
+  // Saved again from the reopened copy: same stored file, still there.
+  store.saveDraft(meta(), state({ photo: opened.draft.photo }), opened.cutoutUri);
+  assert.ok(exists(`drafts/${ID}.p.heic`));
+  // The stored photo deleted meanwhile: the draft opens without it.
+  fs.files.delete(`${MEDIA}/drafts/${ID}.p.heic`);
+  const again = store.loadDraft(ID);
+  assert.ok(again);
+  assert.equal("photo" in again.draft, false);
+  // A picked file that is really gone is only left out of the save.
+  fs.files.delete(original);
+  store.saveDraft(meta(), state({ photo: original }), opened.cutoutUri);
+  assert.equal("photo" in store.loadDraft(ID).draft, false);
+  // A draft without the photo removes the stored copy.
+  fs.files.set(original, "heic-main");
+  store.saveDraft(meta(), state({ photo: original }), opened.cutoutUri);
+  assert.ok(exists(`drafts/${ID}.p.heic`));
+  store.saveDraft(meta(), state(), opened.cutoutUri);
+  assert.equal(exists(`drafts/${ID}.p.heic`), false);
+  const plain = store.loadDraft(ID);
+  assert.equal("photo" in plain.draft, false);
+  assert.equal("variant" in plain.draft, false);
+});

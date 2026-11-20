@@ -203,6 +203,8 @@ export function TemplateChoicePanel({
   fontStyle,
   copy,
   safeArea,
+  header,
+  headerHeight = 0,
 }: {
   ids: readonly TemplateId[];
   template: TemplateId;
@@ -215,8 +217,15 @@ export function TemplateChoicePanel({
   fontStyle: FontStyle | null;
   copy: PosterCopy;
   safeArea: "none" | "social";
+  /** Shown above the tiles (the photo strip); `headerHeight` is its height. */
+  header?: ReactNode;
+  headerHeight?: number;
 }) {
-  const space = usePanelSpace(),
+  const panelSpace = usePanelSpace(),
+    space =
+      panelSpace === undefined
+        ? undefined
+        : Math.max(0, panelSpace - headerHeight),
     { width: screenWidth } = useWindowDimensions(),
     { fontScale } = useWindowDimensions(),
     t = useT();
@@ -233,7 +242,7 @@ export function TemplateChoicePanel({
         ? byWidth
         : Math.floor(((space - caption - Space.l) * 9) / 16),
     width = Math.max(56, Math.min(byWidth, byHeight));
-  return (
+  const tiles = (
     <ScrollView
       style={space === undefined ? undefined : { maxHeight: space }}
       contentContainerStyle={choiceStyles.row}
@@ -257,6 +266,13 @@ export function TemplateChoicePanel({
         />
       ))}
     </ScrollView>
+  );
+  if (!header) return tiles;
+  return (
+    <View>
+      {header}
+      {tiles}
+    </View>
   );
 }
 
@@ -1642,15 +1658,19 @@ export function MusicPanel({
   onPick,
   onRemove,
   disabled,
+  beats,
 }: {
   music: { name: string } | null;
   onPick: () => void;
   onRemove: () => void;
   disabled: boolean;
+  /** The beat chips ("Ritim 1-4", "Kapalı"), above the own-file picker. */
+  beats?: ReactNode;
 }) {
   const t = useT();
   return (
     <View style={[styles.panel, styles.padded]}>
+      {beats}
       <View style={styles.musicRow}>
         <Icon
           name="music.note"

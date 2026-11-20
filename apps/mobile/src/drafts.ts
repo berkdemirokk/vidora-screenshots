@@ -124,7 +124,107 @@ export type EditState = {
   brandAccent: { accent: string; onAccent: string } | null;
   /** The cut-out size; the image itself is stored next to the JSON. */
   cutout: { width: number; height: number };
+  /**
+   * Photos 2..8 of the video. On disk: file names next to the JSON
+   * (`<id>.x<n>.<ext>`, cut-out `<id>.x<n>c.png`); in the editor: file URIs.
+   * Absent on drafts with one photo (and on every draft before 1.2).
+   */
+  extraPhotos?: ExtraPhoto[];
+  /** The beat chosen in the editor (src/music); never a file. Absent: default. */
+  musicPattern?: MusicPatternChoice;
+  /**
+   * The gallery variant (src/recipes, e.g. "indirim-2") the video is made
+   * with. Absent: the classic templates (every draft before 1.2).
+   */
+  variant?: string;
+  /**
+   * Photo 1's original photo (the cut-out is made from it). On disk: a file
+   * name next to the JSON (`<id>.p.<ext>`); in the editor: a file URI.
+   * Absent on older drafts, which use the cut-out in its place.
+   */
+  photo?: string;
 };
+
+/** One extra photo: the picked file and, when it worked, its cut-out. */
+export type ExtraPhoto = {
+  source: string;
+  cutout?: string;
+  width?: number;
+  height?: number;
+};
+/** Same ids as src/music/patterns.ts, plus "off" (Kapalı). */
+export type MusicPatternChoice = "pulse" | "house" | "chill" | "pop" | "off";
+const MUSIC_PATTERNS = [
+  "pulse",
+  "house",
+  "chill",
+  "pop",
+  "off",
+] as const satisfies readonly MusicPatternChoice[];
+
+/** The main photo plus 7: at most 8 photos per video. */
+export const MAX_EXTRA_PHOTOS = 7;
+/** Stored names written by draft-store.ts; never a path or a URI. */
+const EXTRA_SOURCE = /^[0-9a-f-]{36}\.x[1-7]\.[a-z0-9]{1,5}$/i;
+const EXTRA_CUTOUT = /^[0-9a-f-]{36}\.x[1-7]c\.png$/i;
+/** Photo 1's stored original: `<id>.p.<ext>`. */
+const MAIN_PHOTO = /^[0-9a-f-]{36}\.p\.[a-z0-9]{1,5}$/i;
+/** A variant id like "kutu-acilisi-3"; unknown ones are dropped by the editor. */
+const VARIANT_ID = /^[a-z]+(?:-[a-z]+)*-[1-9]$/;
+
+function parseExtraPhotos(value: unknown): ExtraPhoto[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: ExtraPhoto[] = [];
+  for (const item of value) {
+    if (out.length >= MAX_EXTRA_PHOTOS) break;
+    if (
+      !isRecord(item) ||
+      typeof item.source !== "string" ||
+      !EXTRA_SOURCE.test(item.source)
+    )
+      continue;
+    const photo: ExtraPhoto = { source: item.source };
+    if (
+      typeof item.cutout === "string" &&
+      EXTRA_CUTOUT.test(item.cutout) &&
+      finite(item.width) &&
+      finite(item.height) &&
+      item.width > 0 &&
+      item.height > 0
+    ) {
+      photo.cutout = item.cutout;
+      photo.width = item.width;
+      photo.height = item.height;
+    }
+    out.push(photo);
+  }
+  return out.length > 0 ? out : null;
+}
+
+/**
+ * The stored extra photos whose files are still there: a photo whose file is
+ * gone is dropped (`missing` then asks for the note), a lost cut-out only
+ * leaves the photo without one (it is made again).
+ */
+export function restoreExtraPhotos(
+  list: readonly ExtraPhoto[],
+  exists: (name: string) => boolean,
+): { photos: ExtraPhoto[]; missing: boolean } {
+  const photos: ExtraPhoto[] = [];
+  let missing = false;
+  for (const photo of list) {
+    if (!exists(photo.source)) {
+      missing = true;
+      continue;
+    }
+    photos.push(
+      photo.cutout && exists(photo.cutout)
+        ? { ...photo }
+        : { source: photo.source },
+    );
+  }
+  return { photos, missing };
+}
 
 export type Draft = EditState & {
   version: typeof DRAFT_VERSION;
@@ -188,6 +288,8 @@ function parseScene(value: unknown): SceneInput | null {
       width: rect.width,
       height: rect.height,
     },
+    // AI Sahne pictures that already show the product (no cut-out over them).
+    ...(value.containsProduct === true ? { containsProduct: true } : {}),
   };
 }
 
@@ -220,7 +322,22 @@ export function parseEditState(value: unknown): EditState | null {
           name: text(value.music.name) || value.music.file,
         }
       : null;
+  const extraPhotos = parseExtraPhotos(value.extraPhotos),
+    musicPattern = oneOf(MUSIC_PATTERNS, value.musicPattern),
+    variant =
+      typeof value.variant === "string" && VARIANT_ID.test(value.variant)
+        ? value.variant
+        : null,
+    photo =
+      typeof value.photo === "string" && MAIN_PHOTO.test(value.photo)
+        ? value.photo
+        : null;
   return {
+    // All are left out when absent, so older drafts read as before.
+    ...(extraPhotos ? { extraPhotos } : {}),
+    ...(musicPattern ? { musicPattern } : {}),
+    ...(variant ? { variant } : {}),
+    ...(photo ? { photo } : {}),
     template,
     palette,
     category,
@@ -303,6 +420,25 @@ export function pickEditState(state: EditState): EditState {
     priceTag: state.priceTag,
     brandAccent: state.brandAccent ? { ...state.brandAccent } : null,
     cutout: { width: state.cutout.width, height: state.cutout.height },
+    ...(state.extraPhotos && state.extraPhotos.length > 0
+      ? {
+          extraPhotos: state.extraPhotos
+            .slice(0, MAX_EXTRA_PHOTOS)
+            .map((p) =>
+              p.cutout
+                ? {
+                    source: p.source,
+                    cutout: p.cutout,
+                    width: p.width,
+                    height: p.height,
+                  }
+                : { source: p.source },
+            ),
+        }
+      : {}),
+    ...(state.musicPattern ? { musicPattern: state.musicPattern } : {}),
+    ...(state.variant ? { variant: state.variant } : {}),
+    ...(state.photo ? { photo: state.photo } : {}),
   };
 }
 

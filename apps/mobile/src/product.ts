@@ -69,6 +69,26 @@ type NativeProduct = {
   copyAvailability?: (
     lang: string,
   ) => Promise<{ available: boolean; reason?: string }>;
+  /**
+   * Missing in builds made before listing text. Raw model text (JSON asked
+   * in the prompt); throws "product-listing-unavailable" when it cannot run.
+   */
+  listingText?: (
+    name: string,
+    category: string,
+    price: string,
+    lang: string,
+  ) => Promise<string>;
+  /** Missing in builds made before listing text; throws "product-translate-unavailable". */
+  translateTexts?: (
+    texts: string[],
+    from: string,
+    to: string,
+  ) => Promise<string[]>;
+  /** Missing in builds made before listing text: {write: langs, translate: langs}. */
+  textAvailability?: () => Promise<unknown>;
+  /** Missing in builds made before listing text: puts text on the pasteboard. */
+  copyText?: (text: string) => Promise<boolean>;
   addListener: (
     event: "onRenderProgress",
     listener: (payload: { progress: number }) => void,
@@ -664,6 +684,90 @@ export async function aiCopyResult(
   return parsed.headlines.length + parsed.ctas.length > 0
     ? { kind: "ok", suggestions: parsed }
     : { kind: "failed" };
+}
+
+/**
+ * Which languages the device can write listing text in and translate it
+ * into, as the native side reports it (src/listing.ts checks the shape).
+ * Null on builds without it or when the check fails.
+ */
+export async function nativeTextAvailability(): Promise<unknown> {
+  const check = native?.textAvailability;
+  if (!check) return null;
+  try {
+    return await check();
+  } catch (error) {
+    diag("product: text availability check failed", error);
+    return null;
+  }
+}
+
+/**
+ * Raw listing text from Apple's on-device model. Null when the build
+ * predates it or the model / language cannot run; other failures throw.
+ */
+export async function nativeListingText(
+  name: string,
+  category: string,
+  price: string,
+  lang: string,
+): Promise<string | null> {
+  const write = native?.listingText;
+  if (!write) return null;
+  try {
+    return await write(name, category, price, lang);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("product-listing-unavailable")) return null;
+    diag("product: listing text failed", error);
+    throw new LocalizedError(
+      "İlan metni yazılamadı. Tekrar dene.",
+      "Couldn't write the listing text. Try again.",
+    );
+  }
+}
+
+/**
+ * The texts translated on the device (Apple's Translation framework), in
+ * order. Null when the build predates it; failures throw a clear message.
+ */
+export async function nativeTranslateTexts(
+  texts: string[],
+  from: string,
+  to: string,
+): Promise<string[] | null> {
+  const translate = native?.translateTexts;
+  if (!translate) return null;
+  try {
+    return await translate(texts, from, to);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    diag("product: translation failed", error);
+    throw new LocalizedError(
+      nativeErrorTurkish(message) ?? TRANSLATE_UNAVAILABLE.tr,
+      nativeErrorEnglish(message) ?? TRANSLATE_UNAVAILABLE.en,
+    );
+  }
+}
+
+const TRANSLATE_UNAVAILABLE = {
+  tr: "Çeviri bu cihazda şu an kullanılamıyor.",
+  en: "Translation isn't available on this device right now.",
+};
+
+/**
+ * Puts `text` on the pasteboard. False on builds without it (the caller
+ * then offers the share sheet, which has "Copy") or when it fails.
+ */
+export async function copyText(text: string): Promise<boolean> {
+  const copy = native?.copyText;
+  if (!copy) return false;
+  try {
+    return (await copy(text)) !== false;
+  } catch (error) {
+    diag("product: copy failed", error);
+    return false;
+  }
 }
 
 /**

@@ -5,8 +5,10 @@ import {
   DRAFT_VERSION,
   draftTitle,
   isDraftId,
+  MAX_EXTRA_PHOTOS,
   parseDraft,
   parseEditState,
+  restoreExtraPhotos,
   sameEditState,
   serializeDraft,
   sortDrafts,
@@ -282,4 +284,138 @@ test("an inactive own photo is kept with its settings (coordinator item 1)", () 
     ).ownActive,
     false,
   );
+});
+
+// ---- Several photos (rakipleri-gecme task 3) --------------------------------
+
+const extra = (i, withCutout = true) => ({
+  source: `${ID}.x${i}.jpg`,
+  ...(withCutout ? { cutout: `${ID}.x${i}c.png`, width: 600, height: 900 } : {}),
+});
+
+test("draft without extraPhotos parses as before", () => {
+  const raw = serializeDraft(draft);
+  assert.equal("extraPhotos" in JSON.parse(raw), false, "nothing new written");
+  const parsed = parseDraft(raw, ID);
+  assert.deepEqual(parsed, draft);
+  assert.equal("extraPhotos" in parsed, false);
+  assert.equal("musicPattern" in parsed, false);
+  // An empty or broken list is the same as none.
+  for (const extraPhotos of [[], "x", [{ source: 4 }], null])
+    assert.equal(
+      "extraPhotos" in parseDraft(JSON.stringify({ ...draft, extraPhotos }), ID),
+      false,
+    );
+});
+
+test("missing extra photo is dropped", () => {
+  const list = [extra(1), extra(2, false), extra(3)];
+  const stored = { ...draft, extraPhotos: list };
+  const parsed = parseDraft(serializeDraft(stored), ID);
+  assert.deepEqual(parsed.extraPhotos, list, "file names round-trip");
+  // Photo 2 was deleted; photo 3 lost only its cut-out.
+  const onDisk = new Set([list[0].source, list[0].cutout, list[2].source]);
+  const restored = restoreExtraPhotos(parsed.extraPhotos, (name) =>
+    onDisk.has(name),
+  );
+  assert.equal(restored.missing, true, "the editor says so once");
+  assert.deepEqual(restored.photos, [list[0], { source: list[2].source }]);
+  assert.equal(
+    restoreExtraPhotos(parsed.extraPhotos, () => true).missing,
+    false,
+  );
+  // Paths, URIs and other files are refused when read.
+  const bad = parseDraft(
+    JSON.stringify({
+      ...draft,
+      extraPhotos: [
+        { source: "../" + ID + ".x1.jpg" },
+        { source: "file:///x.jpg" },
+        { source: ID + ".x1.jpg", cutout: "/etc/passwd" },
+      ],
+    }),
+    ID,
+  );
+  assert.deepEqual(bad.extraPhotos, [{ source: ID + ".x1.jpg" }]);
+});
+
+test("more than 8 photos is capped", () => {
+  assert.equal(MAX_EXTRA_PHOTOS, 7, "the main photo plus 7");
+  const many = Array.from({ length: 10 }, (_, i) => extra((i % 7) + 1));
+  const parsed = parseDraft(JSON.stringify({ ...draft, extraPhotos: many }), ID);
+  assert.equal(parsed.extraPhotos.length, 7);
+  assert.equal(
+    JSON.parse(serializeDraft({ ...draft, extraPhotos: many })).extraPhotos
+      .length,
+    7,
+  );
+});
+
+test("music pattern stored, not uri", () => {
+  const withBeat = { ...draft, music: null, musicPattern: "house" };
+  const raw = serializeDraft(withBeat);
+  assert.equal(JSON.parse(raw).musicPattern, "house");
+  assert.doesNotMatch(raw, /\.wav|vidora-music|file:\/\/\/cache\/vidora-music/);
+  assert.deepEqual(parseDraft(raw, ID), withBeat);
+  assert.equal(
+    parseDraft(serializeDraft({ ...draft, musicPattern: "off" }), ID)
+      .musicPattern,
+    "off",
+  );
+  const uri = parseDraft(
+    JSON.stringify({
+      ...draft,
+      musicPattern: "file:///cache/vidora-music-v1-house-12000-9000.wav",
+    }),
+    ID,
+  );
+  assert.equal("musicPattern" in uri, false);
+});
+
+test("an AI scene that shows the product keeps its flag in drafts", () => {
+  const ai = { ...draft, scene: { ...draft.scene, containsProduct: true } };
+  assert.deepEqual(parseDraft(serializeDraft(ai), ID), ai);
+  const odd = parseDraft(
+    JSON.stringify({ ...draft, scene: { ...draft.scene, containsProduct: "y" } }),
+    ID,
+  );
+  assert.equal("containsProduct" in odd.scene, false);
+});
+
+test("draft with a variant and photo 1's original round-trips", () => {
+  const withVariant = {
+    ...draft,
+    variant: "kutu-acilisi-3",
+    photo: ID + ".p.heic",
+  };
+  const raw = serializeDraft(withVariant);
+  assert.equal(JSON.parse(raw).variant, "kutu-acilisi-3");
+  assert.equal(JSON.parse(raw).photo, ID + ".p.heic");
+  assert.deepEqual(parseDraft(raw, ID), withVariant);
+  // Odd values are dropped, the draft still opens.
+  for (const bad of [
+    { variant: 4 },
+    { variant: "../x" },
+    { variant: "Kombin 1" },
+    { photo: "file:///cache/p.jpg" },
+    { photo: "../" + ID + ".p.jpg" },
+    { photo: ID + ".x1.jpg" },
+  ]) {
+    const parsed = parseDraft(JSON.stringify({ ...draft, ...bad }), ID);
+    assert.ok(parsed, JSON.stringify(bad));
+    assert.equal("variant" in parsed, false);
+    assert.equal("photo" in parsed, false);
+  }
+});
+
+test("an old draft (no variant, no photo) is unchanged", () => {
+  const raw = serializeDraft(draft);
+  const json = JSON.parse(raw);
+  assert.equal("variant" in json, false, "nothing new written");
+  assert.equal("photo" in json, false, "nothing new written");
+  const parsed = parseDraft(raw, ID);
+  assert.deepEqual(parsed, draft);
+  assert.equal("variant" in parsed, false);
+  assert.equal("photo" in parsed, false);
+  assert.equal(serializeDraft(parsed), raw, "byte-identical");
 });

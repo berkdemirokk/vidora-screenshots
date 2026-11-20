@@ -21,6 +21,13 @@ import {
   type SceneInput,
 } from "./product-templates";
 import { STILL_STYLES, type StillStyleId } from "./marketplace-images";
+import {
+  guardAiScene,
+  resolveMusicPattern,
+  shownProductScene,
+} from "./editor-media";
+import { musicFile } from "./music";
+import type { ReactNode } from "react";
 import { Button, Space, s, useT } from "./ui";
 
 
@@ -88,7 +95,7 @@ export async function specFromState(
     scene = await backdropScene(state.backdrop, cutout.width, cutout.height);
   else if (state.scene) scene = { ...state.scene, productRect };
   const { backdrop } = state;
-  return buildSpec({
+  const spec = buildSpec({
     template: state.template,
     palette: state.palette,
     product: cutoutUri,
@@ -125,7 +132,28 @@ export async function specFromState(
     quality: options.quality,
     watermark: options.watermark,
   });
+  // An AI picture that already shows the product: no cut-out over it.
+  const guarded = guardAiScene(
+    spec,
+    shownProductScene(state.scene, {
+      ownActive: !!own,
+      backdrop: state.backdrop,
+    }),
+  );
+  // The chosen beat (stored as a pattern, made here for this length).
+  const pattern = resolveMusicPattern(state.musicPattern ?? null, false);
+  if (options.withMusic === false || state.music || !pattern) return guarded;
+  return {
+    ...guarded,
+    music: {
+      uri: await musicFile(pattern, BEAT_BPM, guarded.duration),
+      volume: 0.8,
+    },
+  };
 }
+
+/** Tempo of the editor's beats ("Ritim 1-4"). */
+export const BEAT_BPM = 120;
 
 const RATIO_NAMES: Record<AspectRatio, { tr: string; en: string }> = {
   "9:16": { tr: "Dikey", en: "Vertical" },
@@ -148,7 +176,10 @@ export function ExportPanel({
   progress,
   proBadge,
   disabled,
+  music,
 }: {
+  /** The beat chips ("Müzik"), shown first. */
+  music?: ReactNode;
   ratio: AspectRatio;
   onRatio: (value: AspectRatio) => void;
   onStill?: (id: StillStyleId) => void;
@@ -168,6 +199,7 @@ export function ExportPanel({
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.sheet}
     >
+      {music}
       <View style={styles.group}>
         <PanelLabel>{t("Oran", "Shape")}</PanelLabel>
         <ChipRow<AspectRatio>

@@ -3,6 +3,31 @@
  * Generated from tools/extract-i18n.mjs; {0}, {1} are values filled in by the app.
  */
 export const es: Readonly<Record<string, string>> = {
+  "Bu şablon için {0} fotoğraf seç: önce ve sonra.": "Elige {0} fotos para esta plantilla: antes y después.",
+  "Yeni": "Nuevo",
+  "Tanıtım": "Presentación",
+  "Kombin": "Conjunto",
+  "Kutu Açılışı": "Unboxing",
+  "Önce/Sonra": "Antes/Después",
+  "Ürün Detayları": "Detalles del producto",
+  "{0} fotoğraf": "{0} fotos",
+  "{0}-{1} fotoğraf": "{0}-{1} fotos",
+  "Fotoğraflarını seç, video hazırlansın.": "Elige tus fotos y se creará el vídeo.",
+  "Klasik şablonlar": "Plantillas clásicas",
+  "{0} şablonuna dön": "Volver a {0}",
+  "Fotoğraflar ekleniyor…": "Añadiendo fotos…",
+  "Bu çalışmanın bazı dosyaları bulunamadı; kalanlarla açıldı.": "No se encontraron algunos archivos de este trabajo; se abrió con el resto.",
+  "Bu çalışmanın bazı fotoğrafları bulunamadı; kalan fotoğraflarla açıldı.": "No se encontraron algunas fotos de este trabajo; se abrió con las demás.",
+  "1. fotoğraf, ana ürün": "Foto 1, producto principal",
+  "{0}. fotoğraf": "Foto {0}",
+  "{0}. fotoğrafı kaldır": "Quitar la foto {0}",
+  "Fotoğraf ekle": "Añadir fotos",
+  "{0} fotoğraf daha ekleyebilirsin.": "Puedes añadir {0} fotos más.",
+  "Ritim 1": "Ritmo 1",
+  "Ritim 2": "Ritmo 2",
+  "Ritim 3": "Ritmo 3",
+  "Ritim 4": "Ritmo 4",
+  "Kapalı": "Desactivada",
   " Fotoğraflar'a kaydedildi.": " guardada en Fotos.",
   " yazılırken videodaki metin canlı değişir.":
     " el texto del vídeo cambia en directo.",
@@ -86,8 +111,6 @@ export const es: Readonly<Record<string, string>> = {
   "AI Sahne bulutta çalışır": "Escena IA funciona en la nube",
   "AI Sahne izni geri alındı": "Permiso de Escena IA retirado",
   "AI Sahne iznini geri al": "Retirar el permiso de Escena IA",
-  "AI Sahne ürününü mermer stüdyodan sahile kadar fotoğraf gerçekliğinde sahnelere yerleştirir. Ürünün ve logon hiç değişmez; fotoğrafın telefonundan çıkmaz.":
-    "Escena IA coloca tu producto en escenas fotorrealistas, desde un estudio de mármol hasta la playa. Tu producto y tu logotipo no cambian nunca, y tu foto no sale de tu teléfono.",
   "AI Sahne Vidora Pro ile açılır.": "Escena IA se incluye con Vidora Pro.",
   "AI stüdyo": "Estudio IA",
   "AI Stüdyo": "Estudio IA",
@@ -130,13 +153,11 @@ export const es: Readonly<Record<string, string>> = {
   "Apple Intelligence ile öner": "Sugerir con Apple Intelligence",
   "Apple tarafından işlendi": "procesado por Apple",
   "Arka plan": "Fondo",
-  "Arka plan Fotoğraflar'a kaydedildi.": "Fondo guardado en Fotos.",
   "Arka plan görseli okunamadı. Başka bir zemin ya da sahne seç.":
     "No se pudo leer la imagen de fondo. Elige otro fondo u otra escena.",
   "Arka plan telefonunda silinir, fotoğrafın dışarı çıkmaz.":
     "El fondo se quita en tu teléfono; la foto no sale de él.",
   "Arka planı kaldırılmış ürün": "Producto recortado",
-  "Arka planı kaydet": "Guardar fondo",
   "Aşağı taşı": "Mover abajo",
   "ay başına {0}": "{0} al mes",
   Ayarlar: "Ajustes",
@@ -198,7 +219,6 @@ export const es: Readonly<Record<string, string>> = {
   Bitti: "Listo",
   "Boş bıraktığın alan videoda görünmez.":
     "Los campos que dejes vacíos no aparecen en el vídeo.",
-  Botanik: "Botánico",
   Boyut: "Tamaño",
   "Bu Apple Hesabında etkin bir Vidora Pro aboneliği bulunamadı.":
     "No se encontró una suscripción activa a Vidora Pro en esta cuenta de Apple.",
@@ -247,12 +267,6 @@ export const es: Readonly<Record<string, string>> = {
   "Bu video silinsin mi?": "¿Eliminar este vídeo?",
   "Bu videonun sesi okunamadı.": "No se pudo leer el audio de este vídeo.",
   "Bugün kalan: {0} sahne": "Quedan hoy: {0} escenas",
-  "Bugünkü sahne hakkın doldu. Hakların gece yarısı (UTC) yenilenir.":
-    "Has usado las escenas de hoy. Se renuevan a medianoche (UTC).",
-  "Bugünkü yapay zekâ kotası doldu, yarın tekrar dene.":
-    "Se agotó la cuota de IA de hoy; inténtalo mañana.",
-  "Buluta yalnızca seçtiğin sahne stili ve abonelik doğrulaması gider; ürün fotoğrafın gönderilmez.":
-    "Solo el estilo de escena que elijas y una comprobación de suscripción van a la nube; tu foto de producto no se envía.",
   "Buton yazısı": "Texto del botón",
   "Buton yazısı önerileri": "Ideas para el texto del botón",
   "Büyük fiyat": "Precio grande",
@@ -284,8 +298,6 @@ export const es: Readonly<Record<string, string>> = {
   Detay: "Detalle",
   Dev: "Impact",
   "Devam et": "Continuar",
-  "Devam etmek için AI Sahne'nin buluta istek göndermesine izin vermelisin.":
-    "Para continuar, permite que Escena IA envíe una solicitud a la nube.",
   "Dışa aktarılıyor": "Exportando",
   "Dışa aktarma bitene kadar Vidora'yı açık tut.":
     "Mantén Vidora abierta hasta que termine la exportación.",
@@ -397,8 +409,6 @@ export const es: Readonly<Record<string, string>> = {
   Gizlilik: "Privacidad",
   "Gizlilik politikası": "Política de privacidad",
   "Gizlilik Politikası": "Política de privacidad",
-  "Gönderilen: seçtiğin sahne stili ve aboneliğini doğrulamak için App Store'un imzaladığı abonelik bilgisi (ürün, işlem numarası, bitiş tarihi). Adın, e-postan veya ödeme bilgin gönderilmez.":
-    "Se envía: el estilo de escena que elijas y el registro de suscripción firmado por el App Store para verificar tu suscripción (producto, número de transacción, vencimiento). Ni nombre, ni correo, ni datos de pago.",
   görsel: "imagen",
   Görsel: "Imagen",
   "Görsel boyutu desteklenmiyor (kenarlar 500–4096 piksel olmalı).":
@@ -468,7 +478,6 @@ export const es: Readonly<Record<string, string>> = {
     "Revisa tu conexión a internet e inténtalo de nuevo.",
   "İnternete bağlanılamadı. Bağlantını kontrol edip tekrar dene.":
     "No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.",
-  "İpek kumaş": "Tela de seda",
   "iPhone'da Ayarlar'ı aç.": "Abre Ajustes en tu iPhone.",
   "iPhone'da yer kalmadı. Biraz yer açıp tekrar dene.":
     "Tu iPhone se ha quedado sin espacio. Libera algo de espacio e inténtalo de nuevo.",
@@ -499,8 +508,6 @@ export const es: Readonly<Record<string, string>> = {
     "No funcionó. Inténtalo de nuevo; si sigue pasando, cierra y vuelve a abrir la app.",
   "İşlem tamamlanamadı. Tekrar dene.": "No funcionó. Inténtalo de nuevo.",
   "İşleniyor…": "Procesando…",
-  "İşleyen: {0}, FLUX.1 [schnell] modeliyle. Vidora'nın sunucusu yalnızca günlük kullanım sayacını tutar (2 gün).":
-    "Procesado por: {0}, con el modelo FLUX.1 [schnell]. El servidor de Vidora solo guarda un contador de uso diario (2 días).",
   "İzin ver ve devam et": "Permitir y continuar",
   Kal: "Quedarme",
   Kaldır: "Quitar",
@@ -584,7 +591,6 @@ export const es: Readonly<Record<string, string>> = {
     "Crea un vídeo nuevo a partir de una copia",
   Koşullar: "Condiciones",
   Koyu: "Oscuro",
-  "Koyu premium": "Premium oscuro",
   "Kozmetik ve parfüm": "Belleza y fragancias",
   Kullanım: "Uso",
   "Kullanım izinleri": "Consentimiento de uso",
@@ -615,7 +621,6 @@ export const es: Readonly<Record<string, string>> = {
   "Logo yok": "Sin logotipo",
   "Logoyu değiştir": "Cambiar logotipo",
   "Logoyu kaldır": "Quitar logotipo",
-  "Lüks vitrin": "Escaparate de lujo",
   Mağaza: "Tienda",
   "Mağaza adın büyük yazılır, ürün ortada süzülür; takip çağrısıyla biter.":
     "El nombre de tu tienda en letras grandes, el producto flotando y un llamado a seguirte al final.",
@@ -630,14 +635,12 @@ export const es: Readonly<Record<string, string>> = {
   Metin: "Texto",
   "Metni düzenle ({0} satır)": "Editar texto ({0} líneas)",
   Minimal: "Minimal",
-  "Minimal beton": "Hormigón minimal",
   Modern: "Moderno",
   Mor: "Morado",
   "MP4 seç": "Elegir MP4",
   "MP4, 8 saniyeden uzun, küçük dosya: ürün sayfasına yüklemeye hazır.":
     "MP4, de más de 8 segundos, archivo pequeño: listo para una página de producto.",
   "MP4, en yüksek görüntü kalitesi.": "MP4 con la máxima calidad.",
-  "Mutfak tezgâhı": "Encimera de cocina",
   "Müziği aç": "Activar la música",
   "Müziği değiştir": "Cambiar música",
   "Müziği kaldır": "Quitar la música",
@@ -666,7 +669,6 @@ export const es: Readonly<Record<string, string>> = {
   Orta: "Centro",
   Otomatik: "Automático",
   "Otomatik altyazı": "Subtítulos automáticos",
-  "Oturma odası": "Salón",
   Oynat: "Reproducir",
   "Oynatmak veya durdurmak için dokun": "Toca para reproducir o pausar",
   "Ödeme, satın alma onayında Apple Hesabından alınır. Abonelik, geçerli dönemin bitiminden en az 24 saat önce iptal edilmezse otomatik olarak yenilenir. App Store hesap ayarlarından dilediğin zaman yönetebilir veya iptal edebilirsin.":
@@ -713,7 +715,6 @@ export const es: Readonly<Record<string, string>> = {
   Paketleme: "Packaging",
   "Paneli kapat": "Cerrar el panel",
   "Para kazanmanın en hızlı yolu": "La forma más rápida de ganar dinero",
-  "Pastel podyum": "Podio pastel",
   Paylaş: "Compartir",
   "Paylaşım açılıyor…": "Abriendo compartir…",
   Pazaryeri: "Marketplace",
@@ -749,16 +750,12 @@ export const es: Readonly<Record<string, string>> = {
   "Sağa taşı": "Mover a la derecha",
   "Sağdaki kare bu fotoğraftan telefonda hazırlandı.":
     "El fotograma de la derecha se creó en el teléfono a partir de esta foto.",
-  "Sahil gün batımı": "Atardecer en la playa",
   Sahne: "Escena",
   "Sahne {0}": "Escena {0}",
   "Sahne oluştur ({0})": "Crear escenas ({0})",
   "Sahne tarifi": "Descripción de la escena",
-  "Sahneler hazırlanıyor (5–20 sn)…": "Creando escenas (5–20 s)…",
   "Sahneyi değiştir": "Cambiar escena",
   "Sahneyi kaldır": "Quitar escena",
-  "Sahneyi telefon değil, üçüncü taraf bir yapay zekâ servisi çizer. Devam etmeden önce neyin paylaşıldığını bil:":
-    "La escena la dibuja un servicio de IA de terceros, no tu teléfono. Antes de continuar, esto es lo que se comparte:",
   Sarı: "Amarillo",
   "Satın alımları geri yükle": "Restaurar compras",
   "Satın alma onay bekliyor (ör. Satın Alma İzni). Onaylandığında Pro kendiliğinden açılır. Onaylanınca Videoyu oluştur düğmesine tekrar dokun.":
@@ -804,7 +801,6 @@ export const es: Readonly<Record<string, string>> = {
   "Sosyal medya": "Redes sociales",
   Standart: "Estándar",
   Stüdyo: "Estudio",
-  "Stüdyo mermer": "Mármol de estudio",
   "Stüdyo zeminleri": "Fondos de estudio",
   "Süre (1–10 sn)": "Duración (1–10 s)",
   "Süre 1 ile 10 arasında tam sayı olmalı.":
@@ -876,8 +872,6 @@ export const es: Readonly<Record<string, string>> = {
     "El producto se recorta en tu teléfono.",
   "Ürün ayrılırken uygulama arka plana geçti. Tekrar dene.":
     "La app pasó a segundo plano mientras se recortaba el producto. Inténtalo de nuevo.",
-  "Ürün fotoğrafın telefonundan çıkmaz. Yapay zekâ yalnızca boş bir sahne çizer; ürünün telefonunda üstüne yerleştirilir.":
-    "Tu foto de producto no sale de tu teléfono. La IA solo dibuja una escena vacía; tu producto se coloca encima en tu teléfono.",
   "Ürün fotoğrafından yaptığın videolar burada görünür.":
     "Los vídeos que crees a partir de una foto de producto aparecen aquí.",
   "Ürün fotoğrafını seç": "Elige una foto de producto",
@@ -976,8 +970,6 @@ export const es: Readonly<Record<string, string>> = {
   "Vidora Pro'yu seç ve Aboneliği İptal Et'e dokun.":
     "Elige Vidora Pro y toca «Cancelar suscripción».",
   "Vidora sürüm ": "Vidora versión ",
-  "Vidora'nın diğer tüm özellikleri telefonunda çalışmaya devam eder. AI Sahne'yi kullanmayı bıraktığında hiçbir şey gönderilmez.":
-    "Todas las demás funciones de Vidora siguen funcionando en tu teléfono. Si dejas de usar Escena IA, no se envía nada.",
   Vitrin: "Escaparate",
   "Vurgu rengi": "Color de acento",
   Vurgulu: "Resaltado",
@@ -990,10 +982,6 @@ export const es: Readonly<Record<string, string>> = {
   "Yapay zekâ sahnesi": "Escena IA",
   "Yapay zekâ stüdyosu bu sürümde henüz açık değil.":
     "El estudio IA aún no está disponible en esta versión.",
-  "Yapay zekâ yalnızca boş sahneyi çizer; ürünün telefonunda, olduğu gibi üstüne yerleştirilir.":
-    "La IA solo dibuja la escena vacía; tu producto se coloca encima en tu teléfono, tal cual es.",
-  "Yapay zekâ yanıt vermedi. Hakkın düşülmedi; tekrar dene.":
-    "La IA no respondió. No se descontó nada; inténtalo de nuevo.",
   "Yapay zekâyla metin önerileri": "Sugerencias de texto con IA",
   "Yapay zekâyla öneri al": "Obtener sugerencias de IA",
   "Yavaş kamera yaklaşması, ürünün üzerinde gezen ışık.":
@@ -1047,4 +1035,53 @@ export const es: Readonly<Record<string, string>> = {
   "Ürün zeminden tam ayrılmamış olabilir. Sade bir zeminde tekrar çek.":
     "Puede que el producto no esté totalmente separado. Vuelve a hacer la foto sobre un fondo liso.",
   "Yeni Koleksiyon": "Nueva colección",
+  "AI Sahne ürününü spa taşından sahile kadar fotoğraf gerçekliğinde sahnelere yerleştirir. Ürün fotoğrafın yapay zekâ servisine gönderilir; izni istediğin zaman Ayarlar'dan geri alabilirsin.": "Escena IA coloca tu producto en escenas fotorrealistas, desde pizarra de spa hasta la playa. La foto de tu producto se envía a un servicio de IA; puedes retirar el permiso cuando quieras en Ajustes.",
+  "Ürününü seçtiğin sahneye yerleştiren bir fotoğraf üretilir. Sonuç yapay zekâ işidir; ürünün ayrıntılarını kontrol et.": "Se crea una foto de tu producto en la escena elegida. El resultado es obra de la IA; revisa los detalles de tu producto.",
+  "Şekil": "Formato",
+  "Sahneler hazırlanıyor (10–40 sn)…": "Creando escenas (10–40 s)…",
+  "Görseli kaydet": "Guardar imagen",
+  "Buluta ürün fotoğrafın, seçtiğin sahne stili ve abonelik doğrulaması gider. Fotoğraf sahne üretildikten sonra Vidora'nın sunucusunda saklanmaz.": "A la nube van la foto de tu producto, el estilo de escena elegido y una comprobación de suscripción. La foto no se conserva en el servidor de Vidora una vez creada la escena.",
+  "Ürün fotoğrafın (arka planı kaldırılmış, düz zeminli hâli) buluta gönderilir. Yapay zekâ ürünü seçtiğin sahneye yerleştiren yeni bir fotoğraf üretir.": "La foto de tu producto (recortado, sobre un fondo liso) se envía a la nube. La IA crea una foto nueva que coloca tu producto en la escena elegida.",
+  "Gönderilen: ürün fotoğrafın, seçtiğin sahne stili ve aboneliğini doğrulamak için App Store'un imzaladığı abonelik bilgisi (ürün, işlem numarası, bitiş tarihi). Adın, e-postan veya ödeme bilgin gönderilmez.": "Se envía: la foto de tu producto, el estilo de escena elegido y el registro de suscripción firmado por App Store para verificarla (producto, número de transacción, vencimiento). Sin nombre, correo ni datos de pago.",
+  "İşleyen: {0}, FLUX.2 [klein] modeliyle. Vidora'nın sunucusu fotoğrafı saklamaz; yalnızca günlük kullanım sayacını tutar.": "Procesa: {0}, con el modelo FLUX.2 [klein]. El servidor de Vidora no guarda la foto; solo lleva un contador de uso diario.",
+  "Vidora'nın diğer tüm özellikleri, şablonlar dahil, telefonunda çalışmaya devam eder. AI Sahne'yi kullanmayı bıraktığında hiçbir şey gönderilmez.": "El resto de las funciones de Vidora, plantillas incluidas, siguen funcionando en tu teléfono. Si dejas de usar Escena IA, no se envía nada.",
+  "Sahneyi telefon değil, üçüncü taraf bir yapay zekâ servisi üretir. Devam etmeden önce neyin paylaşıldığını bil:": "La escena la crea un servicio de IA de terceros, no tu teléfono. Antes de continuar, esto es lo que se comparte:",
+  "Spa taşı": "Pizarra de spa",
+  "Lavanta tarlası": "Campo de lavanda",
+  "Mermer banyo": "Baño de mármol",
+  "Meşe mutfak": "Cocina de roble",
+  "Stüdyo ışığı": "Luz de estudio",
+  "Altın sahil": "Playa dorada",
+  "Botanik yosun": "Musgo botánico",
+  "Lüks kadife": "Terciopelo de lujo",
+  "Hikâye 9:16": "Historia 9:16",
+  "Gönderi 4:5": "Publicación 4:5",
+  "Kare 1:1": "Cuadrado 1:1",
+  "Devam etmek için AI Sahne'nin ürün fotoğrafını buluta göndermesine izin vermelisin.": "Para continuar, permite que Escena IA envíe la foto de tu producto a la nube.",
+  "Bugünkü sahne hakkın doldu. Yarın tekrar dene: haklar {0} civarı yenilenir. Şablonlar çalışmaya devam eder.": "Has usado las escenas de hoy. Inténtalo mañana: se renuevan sobre las {0}. Las plantillas siguen funcionando.",
+  "Bugünkü sahne hakkın doldu. Yarın tekrar dene. Şablonlar çalışmaya devam eder.": "Has usado las escenas de hoy. Inténtalo mañana. Las plantillas siguen funcionando.",
+  "Bugünkü yapay zekâ kotası doldu. Yarın tekrar dene: kota {0} civarı yenilenir. Şablonlar çalışmaya devam eder.": "La cuota de IA de hoy se ha agotado. Inténtalo mañana: se renueva sobre las {0}. Las plantillas siguen funcionando.",
+  "Bugünkü yapay zekâ kotası doldu. Yarın tekrar dene. Şablonlar çalışmaya devam eder.": "La cuota de IA de hoy se ha agotado. Inténtalo mañana. Las plantillas siguen funcionando.",
+  "Yapay zekâ yanıt vermedi. Biraz sonra tekrar dene.": "La IA no respondió. Inténtalo de nuevo en un momento.",
+  "Fotoğraf yüklenemeyecek kadar büyük. Daha küçük bir fotoğrafla dene.": "La foto es demasiado grande para subirla. Prueba con una foto más pequeña.",
+  "Fotoğraf okunamadı. Başka bir ürün fotoğrafıyla dene.": "No se pudo leer la foto. Prueba con otra foto del producto.",
+  "Bu sahne stili artık yok. Başka bir stil seç.": "Ese estilo de escena ya no existe. Elige otro estilo.",
+  "Fotoğraf gönderilemedi. Tekrar dene.": "No se pudo enviar la foto. Inténtalo de nuevo.",
+  "İlan metni": "Texto del anuncio",
+  "İlan metni yazılıyor…": "Escribiendo el anuncio…",
+  "İlan metni yazılamadı. Tekrar dene.": "No se pudo escribir el texto del anuncio. Inténtalo de nuevo.",
+  "Çeviri bu cihazda şu an kullanılamıyor.": "La traducción no está disponible ahora en este dispositivo.",
+  "Bu dilde ilan metni şu an yazılamıyor.": "Ahora no se puede escribir el anuncio en este idioma.",
+  "Önce bir dilde ilan metni yazılmalı.": "Primero escribe el anuncio en un idioma.",
+  "Çevriliyor…": "Traduciendo…",
+  "Açıklama": "Descripción",
+  "Öne çıkanlar": "Puntos destacados",
+  "Anahtar kelimeler": "Palabras clave",
+  "Kopyala": "Copiar",
+  "Kopyalandı": "Copiado",
+  "Telefonunda Apple Intelligence ile yazılır, hiçbir yere gönderilmez. Yayınlamadan önce kontrol et.": "Se escribe en tu iPhone con Apple Intelligence y no se envía a ningún sitio. Revísalo antes de publicarlo.",
+  "çeviri": "traducción",
+  "Yapay zekâ ürünü yeniden çizer; küçük farklar olabilir.": "La IA redibuja el producto; puede haber pequeñas diferencias.",
+  "Manken · stüdyo": "Modelo · estudio",
+  "Manken · sokak": "Modelo · calle",
 };

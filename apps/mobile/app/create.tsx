@@ -43,9 +43,33 @@ import { cloudAvailable, takeChosenScene } from "../src/cloud";
 import { productPlacement } from "../src/cloud-rules";
 import type { SceneInput } from "../src/product-templates";
 import { Asset } from "expo-asset";
+import { Paths } from "expo-file-system";
 import sampleProduct from "../assets/sample-product.jpg";
 import { buildRecipeSpec } from "../src/recipes/build";
-import { YENI_KOLEKSIYON } from "../src/recipes/yeni-koleksiyon";
+import { variantById } from "../src/recipes";
+import {
+  canStartVariant,
+  parsePhotosParam,
+  recipeChoice,
+} from "../src/gallery";
+import {
+  RecipeReturn,
+  VARIANT_SWITCH_HEIGHT,
+  VariantChoicePanel,
+} from "../src/studio/template-gallery";
+import {
+  EXTRA_CUTOUT_TIMEOUT_MS,
+  MAX_PHOTOS,
+  guardAiScene,
+  photosLeft,
+  recipeSources,
+  resolveMusicPattern,
+  shownProductScene,
+  withTimeout,
+  type MusicChoice,
+} from "../src/editor-media";
+import { musicFile } from "../src/music";
+import { BeatChips, PhotoStrip, photoStripHeight } from "../src/studio/photo-strip";
 import {
   Button,
   Face,
@@ -81,7 +105,6 @@ import {
   draftTitle,
   isDraftId,
   serializeEditState,
-  type Draft,
   type EditState,
 } from "../src/drafts";
 import {
@@ -91,6 +114,7 @@ import {
   newDraftId,
   removeEdit,
   saveDraft,
+  type Restored,
   releaseMusic,
   discardEditorFile,
   saveEdit,
@@ -149,7 +173,11 @@ import {
   replaceTarget,
   type EditTarget,
 } from "../src/render-commit";
-import { ExportPanel, specFromState } from "../src/editor-export";
+import {
+  BEAT_BPM,
+  ExportPanel,
+  specFromState,
+} from "../src/editor-export";
 import { CampaignStrip } from "../src/campaign-strip";
 import { brandAccent, loadBrandKit, type BrandKit } from "../src/brand-kit";
 import type { PriceTagId } from "../src/price-tags";
@@ -176,6 +204,7 @@ import {
   hasStillExport,
   imageInfo,
   pickProductPhoto,
+  pickProductPhotos,
   renderProductVideo,
   type Cutout,
 } from "../src/product";
@@ -393,8 +422,8 @@ const stalledRenderError = () =>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const PanelShell: ComponentType<any> = SINGLE_FLOW ? EditorSheet : SwipePanel;
 
-/** QA_RECIPE only: file uri of the bundled sample photo. */
-async function qaSamplePhotoUri(): Promise<string | null> {
+/** File uri of the bundled sample photo (photo 1 of a recipe on the sample). */
+async function samplePhotoUri(): Promise<string | null> {
   const asset = await Asset.fromModule(sampleProduct).downloadAsync();
   return asset.localUri ?? asset.uri ?? null;
 }
@@ -414,6 +443,10 @@ export default function CreateProductVideo() {
       sample?: string;
       /** Home's "Fotoğraf seç": open the photo source sheet once. */
       pick?: string;
+      /** Home's template gallery: the recipe variant to make (new video only). */
+      variant?: string;
+      /** Photos picked on Home for that variant (JSON list of file URIs). */
+      photos?: string;
     }>(),
     router = useRouter(),
     t = useT(),
@@ -424,12 +457,43 @@ export default function CreateProductVideo() {
     isFocused = useIsFocused(),
     reduceMotion = useReduceMotion();
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  // QA_RECIPE only: the picked photo that `cutout` was made from; not saved.
+  // The gallery variant in use (recipe mode); null for the classic templates.
+  // A new video takes it from Home's card; a draft from its own field.
+  // A recipe never starts with fewer photos than it needs (Önce/Sonra: 2;
+  // the sample is one photo).
+  const [variantId, setVariantId] = useState<string | null>(() => {
+    if (params.draft || params.edit || params.duplicate || !params.variant)
+      return null;
+    const chosen = variantById(params.variant);
+    if (!chosen) return null;
+    const count =
+      params.sample === "1"
+        ? 1
+        : parsePhotosParam(params.photos, Paths.cache.uri).length;
+    return canStartVariant(chosen, count) ? chosen.id : null;
+  });
+  // "Klasik şablonlar" was chosen: the QA recipe override is off too.
+  const [classicChosen, setClassicChosen] = useState(false);
+  // The variant left for a classic template (the way back to it).
+  const [recipeBack, setRecipeBack] = useState<string | null>(null);
+  // The picked photo that `cutout` was made from (photo 1 of a recipe);
+  // stored with drafts next to the cut-out.
   const [sourcePhoto, setSourcePhoto] = useState<{
     cutout: string;
     photo: string;
   } | null>(null),
     [cutout, setCutout] = useState<Cutout | null>(null),
+    // Photos 2..8: the picked file and its cut-out, made one at a time after
+    // the editor opens (`tried` once it was attempted; null = photo mode).
+    [extras, setExtras] = useState<
+      { source: string; cutout: Cutout | null; tried: boolean }[]
+    >([]),
+    // The beat ("Ritim 1-4" / "Kapalı"); null follows the default.
+    [musicChoice, setMusicChoice] = useState<MusicChoice>(null),
+    // The beat's file for the current pattern and video length.
+    [beatFile, setBeatFile] = useState<{ key: string; uri: string } | null>(
+      null,
+    ),
     [category, setCategory] = useState<CategoryId>("cosmetics"),
     // True once the user picked a template or colour; then a category
     // change no longer replaces them (it still updates the copy ideas).
@@ -555,6 +619,26 @@ export default function CreateProductVideo() {
   /** Put a stored draft or video state back into the editor. */
   function applyState(state: EditState, cutoutUri: string) {
     setCutout({ uri: cutoutUri, ...state.cutout });
+    // Restored copies (file URIs); a photo without a cut-out tries once more.
+    setExtras(
+      (state.extraPhotos ?? []).slice(0, MAX_PHOTOS - 1).map((photo) => ({
+        source: photo.source,
+        cutout:
+          photo.cutout && photo.width && photo.height
+            ? { uri: photo.cutout, width: photo.width, height: photo.height }
+            : null,
+        tried: false,
+      })),
+    );
+    setMusicChoice(state.musicPattern ?? null);
+    // A variant this build does not know opens with the classic templates.
+    setVariantId(
+      state.variant && variantById(state.variant) ? state.variant : null,
+    );
+    // Photo 1's original photo (a cache copy); older drafts use the cut-out.
+    setSourcePhoto(
+      state.photo ? { cutout: cutoutUri, photo: state.photo } : null,
+    );
     setTemplate(state.template);
     setPalette(state.palette);
     setCategory(state.category);
@@ -614,6 +698,8 @@ export default function CreateProductVideo() {
       }
       const shape = ratioParam(params.ratio);
       if (shape && !SINGLE_FLOW) setRatio(shape);
+      // Recipes are laid out for 9:16.
+      if (params.variant && variantById(params.variant)) setRatio("9:16");
       if (params.goal === "image" && !SINGLE_FLOW) setTool("format");
       // The next new video starts with the last backdrop and button text.
       // Skipped for the sample (its own copy) and once the user chose a look.
@@ -636,7 +722,7 @@ export default function CreateProductVideo() {
       }
       return;
     }
-    let loaded: { draft: Draft; cutoutUri: string } | null = null;
+    let loaded: Restored | null = null;
     try {
       if (isDraftId(draft)) {
         loaded = loadDraft(draft);
@@ -688,6 +774,8 @@ export default function CreateProductVideo() {
       backdrop:
         !!loaded.draft.ownBackdrop &&
         !ownBackdropExists(loaded.draft.ownBackdrop.file),
+      // An added photo deleted meanwhile: it opens with the others.
+      photos: !!loaded.photosMissing,
     };
     if (missing.music)
       loaded = { ...loaded, draft: { ...loaded.draft, music: null } };
@@ -720,6 +808,8 @@ export default function CreateProductVideo() {
           uri: chosen.backgroundUri,
           crop: chosen.crop,
           productRect: chosen.productRect,
+          // The picture already shows the product: no cut-out over it.
+          ...(chosen.containsProduct ? { containsProduct: true } : {}),
         });
         setBackdrop(null);
         // The own photo stays for later; only the scene shows now.
@@ -949,34 +1039,84 @@ export default function CreateProductVideo() {
     music,
   ]);
 
-  /** The spec as it would be rendered now; drives both preview and render. */
+  /**
+   * Every photo of the video: index 0 is the main product (the picked photo
+   * when known, else its cut-out), then the added ones. Old templates use
+   * photo 0 only; recipes use them all.
+   */
+  const photos = useMemo(
+    () =>
+      cutout
+        ? [
+            {
+              source:
+                sourcePhoto?.cutout === cutout.uri
+                  ? sourcePhoto.photo
+                  : cutout.uri,
+              cutout,
+            },
+            ...extras.map((p) => ({ source: p.source, cutout: p.cutout })),
+          ].slice(0, MAX_PHOTOS)
+        : [],
+    [cutout, sourcePhoto, extras],
+  );
+  // The recipe path: a gallery variant, or (QA only) the QA_RECIPE override;
+  // null keeps the classic templates (buildSpec).
+  const recipeUsed = useMemo(
+    () => recipeChoice(variantId, QA_RECIPE && !classicChosen),
+    [variantId, classicChosen],
+  );
+  const isRecipe = !!recipeUsed && !!cutout;
+  /** The AI picture in use when it already shows the product (else null). */
+  const aiScene = shownProductScene(scene, {
+    ownActive: ownActive && !!ownBackdrop,
+    backdrop,
+  });
+  const beatPattern = resolveMusicPattern(musicChoice, isRecipe);
+
+  // Old templates draw photo 1 only: the added photos change nothing there.
+  const recipePhotos = isRecipe ? photos : null;
+
+  /**
+   * The spec as it would be rendered now; drives both preview and render.
+   * It carries only the seller's own music file: the beat is added when a
+   * video is made (`withBeat`), the preview plays it on its own.
+   */
   const spec = useMemo(() => {
     if (!specInput) return null;
-    // QA only: the editor has just the cut-out, so it stands in for the photo.
-    if (QA_RECIPE && cutout)
-      return buildRecipeSpec(YENI_KOLEKSIYON, {
-        photos: [
-          sourcePhoto?.cutout === cutout.uri ? sourcePhoto.photo : cutout.uri,
-        ],
-        cutouts: [cutout.uri],
+    if (recipePhotos && recipeUsed) {
+      const built = buildRecipeSpec(recipeUsed.recipe, {
+        // An AI picture with the product is photo 1, full frame, no cut-out.
+        ...recipeSources(recipePhotos, aiScene?.uri ?? null),
         name: headline,
         price,
         oldPrice,
         badge,
         cta,
-        palette,
-        ratio,
+        // A variant brings its palette; the QA recipe uses the editor's.
+        palette: recipeUsed.palette ?? palette,
+        // Recipe texts and products are placed for 9:16.
+        ratio: "9:16",
         quality: effectiveQuality,
+        music: specInput.music,
       }) as ProductVideoSpec & { ratio: AspectRatio };
-    return buildSpec({
-      ...specInput,
-      quality: effectiveQuality,
-      watermark: !isPro,
-    });
+      return built;
+    }
+    // Never the cut-out over an AI picture that already shows the product.
+    const built = guardAiScene(
+      buildSpec({
+        ...specInput,
+        quality: effectiveQuality,
+        watermark: !isPro,
+      }),
+      aiScene,
+    ) as ProductVideoSpec & { ratio: AspectRatio };
+    return built;
   }, [
     specInput,
-    cutout,
-    sourcePhoto,
+    recipePhotos,
+    recipeUsed,
+    aiScene,
     headline,
     price,
     oldPrice,
@@ -987,6 +1127,42 @@ export default function CreateProductVideo() {
     effectiveQuality,
     isPro,
   ]);
+
+  // The beat is made on the phone for the video's length (cached by
+  // pattern, tempo and seconds); only the pattern is stored in drafts.
+  const specDuration = spec?.duration ?? 0;
+  useEffect(() => {
+    if (!beatPattern || specDuration <= 0) return;
+    let live = true;
+    const key = `${beatPattern}|${specDuration}`;
+    musicFile(beatPattern, BEAT_BPM, specDuration)
+      .then((uri) => {
+        if (live)
+          setBeatFile((current) =>
+            current?.key === key && current.uri === uri ? current : { key, uri },
+          );
+      })
+      .catch((error: unknown) => diag("beat music failed", { error }));
+    return () => {
+      live = false;
+    };
+  }, [beatPattern, specDuration]);
+  /** What the preview plays: the own file, else the beat once it is made. */
+  const previewMusicUri =
+    spec?.music?.uri ??
+    (beatPattern && beatFile?.key === `${beatPattern}|${specDuration}`
+      ? beatFile.uri
+      : null);
+  /**
+   * The spec a video is made from: the beat file is made (or found in the
+   * cache) now, so a purged cache or a late effect never gives a silent
+   * video. An own music file wins; a failure stops the render with a message.
+   */
+  async function withBeat<S extends ProductVideoSpec>(made: S): Promise<S> {
+    if (made.music || !beatPattern) return made;
+    const uri = await musicFile(beatPattern, BEAT_BPM, made.duration);
+    return { ...made, music: { uri, volume: 0.8 } };
+  }
 
   // Texts the user typed that the engine left out to keep the product large.
   const dropped = spec?.dropped ?? [];
@@ -1021,6 +1197,9 @@ export default function CreateProductVideo() {
     progress !== null || exportAllLine !== null,
   );
 
+  /** Photo 1's original photo when the cut-out was made from it. */
+  const photo0 =
+    cutout && sourcePhoto?.cutout === cutout.uri ? sourcePhoto.photo : null;
   /** The editable state as stored in drafts and next to rendered videos. */
   const editState = useMemo<EditState | null>(
     () =>
@@ -1048,9 +1227,32 @@ export default function CreateProductVideo() {
             priceTag,
             brandAccent: brandAccent(brandKit),
             cutout: { width: cutout.width, height: cutout.height },
+            // File URIs here; draft-store copies them next to the JSON.
+            ...(extras.length > 0
+              ? {
+                  extraPhotos: extras.map((p) =>
+                    p.cutout
+                      ? {
+                          source: p.source,
+                          cutout: p.cutout.uri,
+                          width: p.cutout.width,
+                          height: p.cutout.height,
+                        }
+                      : { source: p.source },
+                  ),
+                }
+              : {}),
+            ...(musicChoice ? { musicPattern: musicChoice } : {}),
+            ...(variantId ? { variant: variantId } : {}),
+            // A file URI here; draft-store copies it next to the JSON.
+            ...(photo0 ? { photo: photo0 } : {}),
           }
         : null,
     [
+      extras,
+      musicChoice,
+      variantId,
+      photo0,
       cutout,
       template,
       palette,
@@ -1171,12 +1373,101 @@ export default function CreateProductVideo() {
       }
       discardEditorFile(shownFiles.current.cutout);
       discardEditorFile(shownFiles.current.scene);
+      // Cache copies of the photos (picked files are not ours to delete).
+      discardEditorFile(sourcePhotoNow.current?.photo);
+      for (const photo of extrasNow.current) {
+        discardEditorFile(photo.source);
+        discardEditorFile(photo.cutout?.uri);
+      }
     };
   }, [flushSave]);
 
-  // The chosen music plays with the preview frames (not over the result).
+  // Added photos: their cut-outs are made one at a time once the editor is
+  // open and idle, and only while the template uses them (a recipe). A
+  // failure, a 60 s wait or a "whole photo" result (nothing separated, the
+  // same check as photo 1) leaves the photo without one (photo mode).
+  const extrasNow = useRef(extras);
+  extrasNow.current = extras;
+  const sourcePhotoNow = useRef(sourcePhoto);
+  sourcePhotoNow.current = sourcePhoto;
+  const extraCutting = useRef(false);
+  useEffect(() => {
+    if (!cutout || !isRecipe || busy || progress !== null) return;
+    if (extraCutting.current) return;
+    const next = extras.find((p) => !p.cutout && !p.tried);
+    if (!next) return;
+    const source = next.source;
+    extraCutting.current = true;
+    const job = Promise.all([cutOut(source), photoPixelSize(source)]).then(
+      ([made, size]): Cutout | null => {
+        if (!isWholePhotoCutout(made, size)) return made;
+        discardEditorFile(made.uri);
+        return null;
+      },
+    );
+    void withTimeout(job, EXTRA_CUTOUT_TIMEOUT_MS, (late) => {
+      // Finished after the wait was given up: nothing shows it.
+      if (late) discardEditorFile(late.uri);
+    })
+      .then(
+        (made) => {
+          if (made === null) diag("extra cut-out gave none");
+          return made;
+        },
+        (error: unknown) => {
+          diag("extra cut-out failed", { error });
+          return null;
+        },
+      )
+      .then((made) => {
+        extraCutting.current = false;
+        const waiting = extrasNow.current.some(
+          (p) => p.source === source && !p.cutout,
+        );
+        if (!mounted.current || !waiting) {
+          // Removed (or left) meanwhile: nothing shows this cut-out.
+          if (made) discardEditorFile(made.uri);
+          if (!mounted.current) return;
+        }
+        // Always a new list, so the next photo's turn starts.
+        setExtras((list) =>
+          list.map((p) =>
+            p.source === source && !p.cutout
+              ? { ...p, cutout: made, tried: true }
+              : p,
+          ),
+        );
+      });
+  }, [extras, cutout, isRecipe, busy, progress]);
+
+  /** "Fotoğraf ekle": more photos from the library, up to 8 in all. */
+  const addPhotos = () =>
+    run(t("Fotoğraflar ekleniyor…", "Adding photos…"), async () => {
+      const left = photosLeft(1 + extrasNow.current.length);
+      if (left <= 0) return;
+      const picked = await pickProductPhotos(left);
+      if (!mounted.current || picked.length === 0) return;
+      tap("select");
+      setExtras((list) =>
+        list
+          .concat(picked.map((source) => ({ source, cutout: null, tried: false })))
+          .slice(0, MAX_PHOTOS - 1),
+      );
+    });
+  /** Remove added photo `index` (1..7 in the strip). */
+  function removePhoto(index: number) {
+    const gone = extras[index - 1];
+    if (!gone) return;
+    // By identity: a second tap before the re-render removes nothing more.
+    setExtras((list) => list.filter((p) => p !== gone));
+    discardEditorFile(gone.source);
+    discardEditorFile(gone.cutout?.uri);
+  }
+
+  // The music in the video (own file or beat) plays with the preview frames
+  // (not over the result).
   const preview = usePreviewMusic(
-    music && !showResult ? musicUri(music.file) : null,
+    !showResult ? previewMusicUri : null,
     spec?.duration ?? 0,
     0.8,
   );
@@ -1340,10 +1631,9 @@ export default function CreateProductVideo() {
         const sampleCutout = await sampleEditorCutout();
         rememberSampleCutout(sampleCutout.width, sampleCutout.height);
         openEditor(sampleCutout);
-        if (QA_RECIPE) {
-          const uri = await qaSamplePhotoUri();
-          if (uri) setSourcePhoto({ cutout: sampleCutout.uri, photo: uri });
-        }
+        // Photo 1 of a recipe is the sample photo itself (photo-mode scenes).
+        const uri = await samplePhotoUri();
+        if (uri) setSourcePhoto({ cutout: sampleCutout.uri, photo: uri });
         const copy = SAMPLE_COPY[baseLang(lang)];
         setHeadline(copy.headline);
         setPrice(copy.price);
@@ -1413,13 +1703,41 @@ export default function CreateProductVideo() {
     // Runs once on mount; `choosePhotoSource` is rebuilt every render.
   }, []);
 
+  // A gallery card on Home: the photos were picked there. Photo 1 is cut out
+  // now; the others become added photos (their cut-outs follow when idle).
+  const photosStarted = useRef(false);
+  useEffect(() => {
+    if (photosStarted.current) return;
+    if (params.draft || params.edit || params.duplicate || params.sample)
+      return;
+    // Only copies the photo picker wrote into the app's cache.
+    const picked = parsePhotosParam(params.photos, Paths.cache.uri);
+    if (picked.length === 0) return;
+    photosStarted.current = true;
+    pickStarted.current = true;
+    // Photos 2..8 first, so they stay even when photo 1's cut-out fails.
+    setExtras(
+      picked
+        .slice(1, MAX_PHOTOS)
+        .map((source) => ({ source, cutout: null, tried: false })),
+    );
+    void run(
+      t("Ürün arka plandan ayrılıyor…", "Cutting out the product…"),
+      async () => {
+        await openPhoto(picked[0]);
+      },
+    );
+    // Runs once on mount; `run` and `openPhoto` are rebuilt every render.
+  }, []);
+
   const openPhoto = async (photo: string) => {
     const [next, size] = await Promise.all([
       cutOut(photo),
       photoPixelSize(photo),
     ]);
     openEditor(next);
-    if (QA_RECIPE) setSourcePhoto({ cutout: next.uri, photo });
+    // Photo 1 of a recipe is the picked photo itself (photo-mode scenes).
+    setSourcePhoto({ cutout: next.uri, photo });
     setWholePhotoUri(isWholePhotoCutout(next, size) ? next.uri : null);
   };
 
@@ -1606,14 +1924,18 @@ export default function CreateProductVideo() {
               0,
               60,
             ) + ".mp4";
-          const clip = await renderProductVideo(spec, fileName, (value) => {
-            // The first event ends the silent preparation phase.
-            watchdog.feed();
-            renderClock.current.percent = value;
-            setProgress(value);
-            setProgressSeen(true);
-            noteRender(renderDiagProgress(value, seconds()));
-          });
+          const clip = await renderProductVideo(
+            await withBeat(spec),
+            fileName,
+            (value) => {
+              // The first event ends the silent preparation phase.
+              watchdog.feed();
+              renderClock.current.percent = value;
+              setProgress(value);
+              setProgressSeen(true);
+              noteRender(renderDiagProgress(value, seconds()));
+            },
+          );
           // Left (or cancelled) while the last frames were written: the user
           // chose to leave, so the new video goes and nothing else changes.
           if (cancelled.current || !mounted.current) {
@@ -1866,12 +2188,15 @@ export default function CreateProductVideo() {
     run(t("Görsel hazırlanıyor…", "Preparing the image…"), async () => {
       if (!specInput) return;
       await saveStillToPhotos(
-        buildSpec({
-          ...specInput,
-          quality: "1080p",
-          watermark: false,
-          music: null,
-        }),
+        guardAiScene(
+          buildSpec({
+            ...specInput,
+            quality: "1080p",
+            watermark: false,
+            music: null,
+          }),
+          aiScene,
+        ),
       );
       setFlash(t("Görsel Fotoğraflar'a kaydedildi.", "Image saved to Photos."));
     });
@@ -1944,13 +2269,16 @@ export default function CreateProductVideo() {
     }
     if (!specInput) return;
     await saveStillToPhotos(
-      buildSpec({
-        ...specInput,
-        ratio: style.ratio as AspectRatio,
-        quality: "1080p",
-        watermark: false,
-        music: null,
-      }),
+      guardAiScene(
+        buildSpec({
+          ...specInput,
+          ratio: style.ratio as AspectRatio,
+          quality: "1080p",
+          watermark: false,
+          music: null,
+        }),
+        aiScene,
+      ),
     );
   }
   const stillStyle = (id: StillStyleId) => {
@@ -2504,6 +2832,61 @@ export default function CreateProductVideo() {
     cta,
     store,
   };
+  // "Fotoğraf ekle": the main photo and up to 7 more, shown only while the
+  // template is a recipe (old templates use photo 1 only). Added photos stay
+  // in the state and the draft when the seller switches to an old template.
+  const photoStrip = (
+    <PhotoStrip
+      photos={[
+        { uri: cutout.uri, pending: false },
+        ...extras.map((p) => ({
+          uri: p.source,
+          // The cut-out queue runs only for recipes.
+          pending: isRecipe && !p.cutout && !p.tried,
+        })),
+      ]}
+      onAdd={() => void addPhotos()}
+      onRemove={removePhoto}
+      disabled={locked}
+    />
+  );
+  /** "Klasik şablonlar": leave the recipe (it can be chosen again). */
+  function chooseClassic() {
+    tap("select");
+    if (variantId) setRecipeBack(variantId);
+    setVariantId(null);
+    setClassicChosen(true);
+    setStyleChosen(true);
+  }
+  /** Back from a classic template to the recipe variant it came from. */
+  function returnToRecipe() {
+    if (!recipeBack || !variantById(recipeBack)) return;
+    tap("select");
+    setVariantId(recipeBack);
+    setRecipeBack(null);
+    setRatio("9:16");
+  }
+  const backVariant = recipeBack ? variantById(recipeBack) : undefined;
+  const recipeReturn =
+    !isRecipe && backVariant ? (
+      <RecipeReturn
+        variant={backVariant}
+        onPress={returnToRecipe}
+        disabled={locked}
+      />
+    ) : undefined;
+  /** A beat replaces an own music file; "Kapalı" turns the music off. */
+  function chooseBeat(value: Exclude<MusicChoice, null>) {
+    if (music) replaceMusic(null);
+    setMusicChoice(value);
+  }
+  const beatChips = (
+    <BeatChips
+      value={music ? null : (beatPattern ?? "off")}
+      onChange={chooseBeat}
+      disabled={locked}
+    />
+  );
   const currentLook =
     activeOwn || scene
       ? null
@@ -2662,16 +3045,25 @@ export default function CreateProductVideo() {
                         ]}
                       />
                     )}
-                    <Image
-                      source={{ uri: cutout.uri }}
-                      resizeMode="contain"
-                      style={styles.product}
-                    />
+                    {aiScene ? (
+                      // The AI picture already shows the product.
+                      <Image
+                        source={{ uri: aiScene.uri }}
+                        resizeMode="cover"
+                        style={[FILL, { width: box.width, height: box.height }]}
+                      />
+                    ) : (
+                      <Image
+                        source={{ uri: cutout.uri }}
+                        resizeMode="contain"
+                        style={styles.product}
+                      />
+                    )}
                   </View>
                 }
                 trailing={
                   <>
-                    {music && (
+                    {previewMusicUri && (
                       <TransportButton
                         testID="preview-mute"
                         icon={
@@ -2801,7 +3193,17 @@ export default function CreateProductVideo() {
                   maxHeight: panelMax,
                 })}
           >
-            {tool === "template" && SINGLE_FLOW && (
+            {tool === "template" && SINGLE_FLOW && recipeUsed?.variant && (
+              <VariantChoicePanel
+                variant={recipeUsed.variant}
+                onVariant={setVariantId}
+                onClassic={chooseClassic}
+                disabled={locked}
+                header={isRecipe ? photoStrip : undefined}
+                headerHeight={photoStripHeight(false)}
+              />
+            )}
+            {tool === "template" && SINGLE_FLOW && !recipeUsed?.variant && (
               <TemplateChoicePanel
                 ids={SINGLE_FLOW_TEMPLATES}
                 template={template}
@@ -2813,6 +3215,14 @@ export default function CreateProductVideo() {
                 fontStyle={fontStyle}
                 copy={posterCopy}
                 safeArea={preset === "reels" ? "social" : "none"}
+                header={isRecipe ? photoStrip : recipeReturn}
+                headerHeight={
+                  isRecipe
+                    ? photoStripHeight(false)
+                    : recipeReturn
+                      ? VARIANT_SWITCH_HEIGHT
+                      : 0
+                }
               />
             )}
             {tool === "template" && !SINGLE_FLOW && (
@@ -2979,6 +3389,7 @@ export default function CreateProductVideo() {
             {tool === "music" && (
               <MusicPanel
                 music={music}
+                beats={beatChips}
                 disabled={locked}
                 onPick={() =>
                   void run(
@@ -2997,6 +3408,7 @@ export default function CreateProductVideo() {
             )}
             {tool === "format" && SINGLE_FLOW && (
               <ExportPanel
+                music={beatChips}
                 ratio={ratio}
                 onRatio={setRatio}
                 onStill={canSaveImage ? pressStillStyle : undefined}
@@ -3058,6 +3470,8 @@ export default function CreateProductVideo() {
           duration={spec?.duration}
           onDone={leaveEditor}
           onEdit={() => setShowResult(false)}
+          listing={{ name: headline, category, price }}
+          lang={lang}
           onSaveStill={canSaveImage ? chooseStill : undefined}
           onSave={() =>
             void run(t("Kaydediliyor…", "Saving…"), async () => {

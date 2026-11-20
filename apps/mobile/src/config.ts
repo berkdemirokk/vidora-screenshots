@@ -3,6 +3,12 @@ export const FEATURES = {
   /** AI video generation through a paired workstation; not part of v1. */
   aiStudio: false,
   /**
+   * AI Sahne: the product photo placed in an AI scene by the cloud worker
+   * (cloud.ts). Also needs EXPO_PUBLIC_CLOUD_URL at build time, so a build
+   * without the worker keeps the feature hidden.
+   */
+  aiScene: true,
+  /**
    * Store screenshot builds only (CI simulator, `EXPO_PUBLIC_SCREENSHOT_MODE=1`
    * at bundle time): shows Pro features without a purchase. Never set for
    * App Store / TestFlight builds, so it is always false there.
@@ -31,10 +37,12 @@ export const QA_QUALITY: "720p" | "1080p" | null =
   qaQualityRaw === "720p" || qaQualityRaw === "1080p" ? qaQualityRaw : null;
 
 /**
- * QA only (`EXPO_PUBLIC_QA_RECIPE=1` at bundle time): the editor renders the
- * "Yeni Koleksiyon" recipe instead of the chosen template, so the simulator
- * run can show the multi-scene renderer. Never set for App Store / TestFlight
- * builds (not in any eas.json profile), so it is always false there.
+ * QA only (`EXPO_PUBLIC_QA_RECIPE=1` at bundle time): an override that makes
+ * the editor render the "Yeni Koleksiyon" recipe when no gallery variant was
+ * chosen, so the simulator run can show the multi-scene renderer from any
+ * entry. Production reaches recipes through Home's template gallery (the
+ * `variant` route param, src/gallery.ts). Never set for App Store /
+ * TestFlight builds (not in any eas.json profile), so it is always false there.
  */
 export const QA_RECIPE = process.env.EXPO_PUBLIC_QA_RECIPE === "1";
 

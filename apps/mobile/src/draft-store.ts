@@ -5,6 +5,8 @@
  *
  *   KareviaMedia/drafts/<draftId>.json  + .png (cut-out) [+ .scene.<ext>]
  *   KareviaMedia/edits/<clipId>.json    + .png (cut-out) [+ .scene.<ext>]
+ *     both with photos 2..8 as [.x<n>.<ext> + .x<n>c.png (cut-out)]
+ *     and photo 1's original photo as [.p.<ext>]
  *   KareviaMedia/backdrops/<uuid>.<ext>  own photos used as backdrops,
  *                                        shared by drafts and videos
  *
@@ -20,12 +22,15 @@ import { Directory, File, Paths } from "expo-file-system";
 import { randomUUID } from "expo-crypto";
 import {
   DRAFT_VERSION,
+  MAX_EXTRA_PHOTOS,
   isDraftId,
   parseDraft,
+  restoreExtraPhotos,
   serializeDraft,
   sortDrafts,
   type Draft,
   type EditState,
+  type ExtraPhoto,
 } from "./drafts";
 import { bumpLibraryVersion, mediaFolder, removeMusic } from "./media";
 import { parseBatch, serializeBatch, type BatchQueue } from "./batch-queue";
@@ -119,6 +124,120 @@ function sceneFile(kind: Kind, key: string): File | null {
   );
 }
 
+const PHOTO_EXTS = ["jpg", "jpeg", "png", "heic", "heif", "webp"];
+/** Copy `uri` to `dest` unless the same file was copied there last time. */
+function copyOnce(cacheKey: string, uri: string, dest: File) {
+  if (savedCutouts.get(cacheKey) === uri && dest.exists) return;
+  copyInto(uri, dest);
+  savedCutouts.set(cacheKey, uri);
+}
+/** True only when the source file is really gone (not a failed copy). */
+function sourceGone(uri: string): boolean {
+  try {
+    return !new File(uri).exists;
+  } catch {
+    return false;
+  }
+}
+/**
+ * Photos 2..8 (editor file URIs) copied next to the JSON. Returns the stored
+ * names; a photo (or cut-out) whose file is gone is left out. Any other copy
+ * failure (a full disk) throws, so the save fails like it does for the main
+ * cut-out and the stored copies stay.
+ */
+function writeExtras(
+  folder: Directory,
+  entry: string,
+  id: string,
+  list: readonly ExtraPhoto[] | undefined,
+): ExtraPhoto[] {
+  const stored: ExtraPhoto[] = [];
+  for (const photo of (list ?? []).slice(0, MAX_EXTRA_PHOTOS)) {
+    const n = stored.length + 1;
+    const ext = extOf(photo.source);
+    const name = `${id}.x${n}.${PHOTO_EXTS.includes(ext) ? ext : "jpg"}`;
+    try {
+      copyOnce(`${entry}|x${n}`, photo.source, new File(folder, name));
+    } catch (error) {
+      // The picked file is gone (cache cleared): the video keeps the others.
+      if (sourceGone(photo.source)) continue;
+      throw error;
+    }
+    const kept: ExtraPhoto = { source: name };
+    if (photo.cutout && photo.width && photo.height) {
+      const cutName = `${id}.x${n}c.png`;
+      try {
+        copyOnce(`${entry}|x${n}c`, photo.cutout, new File(folder, cutName));
+        kept.cutout = cutName;
+        kept.width = photo.width;
+        kept.height = photo.height;
+      } catch (error) {
+        // A cut-out that is gone is made again when the draft opens.
+        if (!sourceGone(photo.cutout)) throw error;
+      }
+    }
+    stored.push(kept);
+  }
+  return stored;
+}
+/** Extra photo files of `id` that the new JSON no longer names. */
+function dropOldExtras(folder: Directory, id: string, stored: ExtraPhoto[]) {
+  const keep = new Set<string>();
+  for (const photo of stored) {
+    keep.add(photo.source);
+    if (photo.cutout) keep.add(photo.cutout);
+  }
+  for (const entry of folder.list())
+    if (
+      entry instanceof File &&
+      entry.name.startsWith(id + ".x") &&
+      !keep.has(entry.name)
+    )
+      try {
+        entry.delete();
+      } catch {
+        // A leftover file; removed with "delete all data".
+      }
+}
+
+/**
+ * Photo 1's original photo (an editor file URI) copied next to the JSON as
+ * `<id>.p.<ext>`. Returns the stored name, or null when there is none or the
+ * picked file is gone. Any other copy failure throws, like the cut-out.
+ */
+function writeMainPhoto(
+  folder: Directory,
+  entry: string,
+  id: string,
+  uri: string | undefined,
+): string | null {
+  if (!uri) return null;
+  const ext = extOf(uri);
+  const name = `${id}.p.${PHOTO_EXTS.includes(ext) ? ext : "jpg"}`;
+  try {
+    copyOnce(`${entry}|p`, uri, new File(folder, name));
+  } catch (error) {
+    // The picked file is gone (cache cleared): the cut-out stands in.
+    if (sourceGone(uri)) return null;
+    throw error;
+  }
+  return name;
+}
+/** Stored main-photo files of `id` other than `keep`. */
+function dropOldMainPhoto(folder: Directory, id: string, keep: string | null) {
+  for (const entry of folder.list())
+    if (
+      entry instanceof File &&
+      entry.name.startsWith(id + ".p.") &&
+      entry.name !== keep
+    )
+      try {
+        entry.delete();
+      } catch {
+        // A leftover file; removed with "delete all data".
+      }
+}
+
 function write(
   kind: Kind,
   draft: Draft,
@@ -146,11 +265,24 @@ function write(
       scene = null;
     }
   }
+  const extras = writeExtras(folder, entry, draft.id, draft.extraPhotos);
+  const photo = writeMainPhoto(folder, entry, draft.id, draft.photo);
+  const { extraPhotos: _uris, photo: _photo, ...rest } = draft;
+  void _uris;
+  void _photo;
   bumpLibraryVersion();
   writeText(
     new File(folder, draft.id + ".json"),
-    serializeDraft({ ...draft, scene }),
+    serializeDraft({
+      ...rest,
+      scene,
+      ...(extras.length > 0 ? { extraPhotos: extras } : {}),
+      ...(photo ? { photo } : {}),
+    }),
   );
+  // Photos removed (or renumbered) since the last save go now.
+  dropOldExtras(folder, draft.id, extras);
+  dropOldMainPhoto(folder, draft.id, photo);
   // Only now, with the new JSON in place, an old scene of another type goes.
   if (oldScene && oldScene.uri !== keepScene)
     try {
@@ -162,9 +294,50 @@ function write(
 
 /** A restored state with working file URIs (fresh copies in the cache). */
 export type Restored = {
+  /** `extraPhotos` here hold cache file URIs, like `cutoutUri`. */
   draft: Draft;
   cutoutUri: string;
+  /** An extra photo's file was gone and it was left out (the editor says so). */
+  photosMissing?: boolean;
 };
+
+/** Cache copies of the stored extra photos; ones whose file is gone are dropped. */
+function readExtras(
+  folder: Directory,
+  list: readonly ExtraPhoto[],
+  tag: string,
+): { photos: ExtraPhoto[]; missing: boolean } {
+  const { photos, missing } = restoreExtraPhotos(
+    list,
+    (name) => !!present(new File(folder, name)),
+  );
+  const out: ExtraPhoto[] = [];
+  let lost = missing;
+  photos.forEach((photo, i) => {
+    try {
+      const source = present(new File(folder, photo.source));
+      if (!source) throw new Error("gone");
+      const copy = new File(
+        Paths.cache,
+        `vidora-photo-${tag}-${i + 1}.${extOf(photo.source)}`,
+      );
+      source.copySync(copy);
+      const restored: ExtraPhoto = { source: copy.uri };
+      const cut = photo.cutout ? present(new File(folder, photo.cutout)) : null;
+      if (cut && photo.width && photo.height) {
+        const cutCopy = new File(Paths.cache, `vidora-cutout-${tag}-${i + 1}.png`);
+        cut.copySync(cutCopy);
+        restored.cutout = cutCopy.uri;
+        restored.width = photo.width;
+        restored.height = photo.height;
+      }
+      out.push(restored);
+    } catch {
+      lost = true;
+    }
+  });
+  return { photos: out, missing: lost };
+}
 
 function read(kind: Kind, key: string): Restored | null {
   if (!isDraftId(key)) return null;
@@ -188,7 +361,41 @@ function read(kind: Kind, key: string): Restored | null {
     storedScene.copySync(copy);
     scene = { ...scene, uri: copy.uri };
   } else scene = null;
-  return { draft: { ...draft, scene }, cutoutUri: cutout.uri };
+  const { photo: storedPhoto, ...withoutPhoto } = draft;
+  const photo = storedPhoto ? readMainPhoto(folder, storedPhoto, tag) : null;
+  const base = photo ? { ...withoutPhoto, photo } : withoutPhoto;
+  if (!base.extraPhotos)
+    return { draft: { ...base, scene }, cutoutUri: cutout.uri };
+  const { extraPhotos: stored, ...rest } = base;
+  const extras = readExtras(folder, stored, tag);
+  return {
+    draft:
+      extras.photos.length > 0
+        ? { ...rest, scene, extraPhotos: extras.photos }
+        : { ...rest, scene },
+    cutoutUri: cutout.uri,
+    photosMissing: extras.missing,
+  };
+}
+
+/**
+ * A cache copy of photo 1's stored original; null when its file is gone (the
+ * cut-out then stands in, as in drafts from before 1.2: no note needed).
+ */
+function readMainPhoto(
+  folder: Directory,
+  name: string,
+  tag: string,
+): string | null {
+  try {
+    const source = present(new File(folder, name));
+    if (!source) return null;
+    const copy = new File(Paths.cache, `vidora-photo-${tag}-0.${extOf(name)}`);
+    source.copySync(copy);
+    return copy.uri;
+  } catch {
+    return null;
+  }
 }
 
 export function newDraftId(): string {
@@ -430,8 +637,8 @@ export function releaseMusic(file: string, exceptDraft?: string): void {
 }
 const dropMusicIfUnused = (file: string) => releaseMusic(file);
 
-/** Cache files the product editor writes: cut-outs and AI scenes. */
-const EDITOR_CACHE = /^vidora-(cutout|ai-scene)-[0-9a-f-]+\.[a-z0-9]+$/i;
+/** Cache files the product editor writes: cut-outs, AI scenes, restored photos. */
+const EDITOR_CACHE = /^vidora-(cutout|ai-scene|photo)-[0-9a-f-]+\.[a-z0-9]+$/i;
 
 /**
  * Delete one editor cache file (a cut-out or AI scene the editor no longer

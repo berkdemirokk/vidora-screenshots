@@ -22,6 +22,7 @@ import {
   Face,
   Icon,
   MaxScale,
+  Press,
   Radius,
   SaveShareRow,
   Space,
@@ -32,6 +33,12 @@ import {
 import { SINGLE_FLOW } from "../config";
 import { CHROME_SCALE, useReduceMotion } from "./controls";
 import { clockLabel } from "./flipbook";
+import { ListingSheet, type ListingInput } from "./listing-sheet";
+import {
+  hasListing,
+  listingAvailability,
+  type ListingAvailability,
+} from "../listing";
 
 /**
  * The finished video over the editor. Single flow (Vitrin): the video plays
@@ -56,6 +63,8 @@ export function ResultView({
   duration,
   onDone,
   onEdit,
+  listing,
+  lang = "tr",
 }: {
   uri: string;
   busy: boolean;
@@ -83,6 +92,13 @@ export function ResultView({
   onDone?: () => void;
   /** "Düzenle" in the action bar (single flow): back to the editor. */
   onEdit?: () => void;
+  /**
+   * The product, for "İlan metni" (marketplace listing text). The button
+   * shows only when the device can write listing text in some language.
+   */
+  listing?: ListingInput;
+  /** The app language, preferred for the listing text. */
+  lang?: string;
 }) {
   const t = useT(),
     insets = useSafeAreaInsets(),
@@ -150,6 +166,32 @@ export function ResultView({
     }, 400);
     return () => clearTimeout(timer);
   }, []);
+
+  // "İlan metni": asked once; hidden on devices without Apple Intelligence.
+  const [listingAv, setListingAv] = useState<ListingAvailability | null>(null);
+  const [listingOpen, setListingOpen] = useState(false);
+  const wantsListing = !!listing;
+  useEffect(() => {
+    if (!wantsListing) return;
+    let alive = true;
+    void listingAvailability().then((av) => {
+      if (alive) setListingAv(av);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [wantsListing]);
+  const showListing = !!listing && !!listingAv && hasListing(listingAv);
+  const listingSheet =
+    showListing && listing && listingAv ? (
+      <ListingSheet
+        visible={listingOpen}
+        input={listing}
+        availability={listingAv}
+        preferred={lang}
+        onClose={() => setListingOpen(false)}
+      />
+    ) : null;
 
   // The spinner shows only when the work takes a moment.
   const [showBusy, setShowBusy] = useState(false);
@@ -288,7 +330,7 @@ export function ResultView({
             maxFontSizeMultiplier={MaxScale.chrome}
             onPress={onShare}
           />
-          {(onDone || onEdit) && (
+          {(onDone || onEdit || showListing) && (
             <View style={styles.lastRow}>
               {onEdit ? (
                 <Pressable
@@ -308,7 +350,28 @@ export function ResultView({
               ) : (
                 <View />
               )}
-              {onDone && (
+              {showListing && (
+                <Pressable
+                  accessibilityRole="button"
+                  testID="result-listing"
+                  disabled={busy}
+                  onPress={() => setListingOpen(true)}
+                  hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
+                  style={({ pressed }) => [
+                    styles.textButton,
+                    pressed && Press.text,
+                    busy && { opacity: 0.4 },
+                  ]}
+                >
+                  <Text
+                    style={styles.doneText}
+                    maxFontSizeMultiplier={MaxScale.chrome}
+                  >
+                    {t("İlan metni", "Listing text")}
+                  </Text>
+                </Pressable>
+              )}
+              {onDone ? (
                 <Pressable
                   accessibilityRole="button"
                   testID="result-bar-done"
@@ -323,6 +386,8 @@ export function ResultView({
                     {t("Bitti", "Done")}
                   </Text>
                 </Pressable>
+              ) : (
+                <View />
               )}
             </View>
           )}
@@ -367,6 +432,7 @@ export function ResultView({
             )}
           </View>
         </Animated.View>
+        {listingSheet}
       </View>
     );
   }
@@ -417,6 +483,17 @@ export function ResultView({
             />
           </View>
         )}
+        {showListing && (
+          <View style={styles.center}>
+            <Button
+              plain
+              testID="result-listing"
+              label={t("İlan metni", "Listing text")}
+              disabled={busy}
+              onPress={() => setListingOpen(true)}
+            />
+          </View>
+        )}
         <View style={styles.statusBox}>
           {error ? (
             <View style={styles.errorLine}>
@@ -455,6 +532,7 @@ export function ResultView({
           )}
         </View>
       </View>
+      {listingSheet}
     </View>
   );
 }

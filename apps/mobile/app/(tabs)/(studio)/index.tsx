@@ -1,9 +1,11 @@
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { baseLang } from "../../../src/i18n/lang";
 import {
+  Alert,
   Animated,
   Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -36,13 +38,12 @@ import {
   usePosterDiag,
   useTemplatePoster,
 } from "../../../src/sample-frames";
-import {
-  heroOffset,
-  photoFrame,
-  posterHeightFor,
-  sheetPaddingBottom,
-} from "../../../src/home-hero-geometry";
+import { compactHeroLayout, missingPhotos } from "../../../src/gallery";
 import { openEditor } from "../../../src/studio/open-editor";
+import { TemplateGallery } from "../../../src/studio/template-gallery";
+import { pickProductPhotos } from "../../../src/product";
+import type { RecipeVariant } from "../../../src/recipes";
+import { diag } from "../../../src/diag";
 import { useReduceMotion } from "../../../src/studio/controls";
 import {
   Button,
@@ -199,10 +200,6 @@ function Showcase({ clip, onPress }: { clip: Clip; onPress: () => void }) {
   );
 }
 
-/** Ink badge on the poster's top right (target: VIDORA). */
-const BADGE_TOP = 12;
-/** The hero layer shows once the sheet height has held still this long (ms). */
-const HERO_SETTLE_MS = 150;
 /** Dynamic Type cap of the Anton texts here; their padding is derived at it. */
 const POSTER_SCALE = 1.2;
 
@@ -297,10 +294,13 @@ function ClipMedia({
   clip,
   width,
   height,
+  playing,
 }: {
   clip: Clip;
   width: number;
   height: number;
+  /** False while the hero is scrolled out of view: the video pauses. */
+  playing: boolean;
 }) {
   const reduceMotion = useReduceMotion();
   const still = thumbnailUri(clip);
@@ -319,11 +319,11 @@ function ClipMedia({
   });
   useFocusEffect(
     useCallback(() => {
-      if (!reduceMotion) player.play();
+      if (!reduceMotion && playing) player.play();
       return () => {
         player.pause();
       };
-    }, [player, reduceMotion]),
+    }, [player, reduceMotion, playing]),
   );
   return (
     <View
@@ -360,12 +360,21 @@ function ClipMedia({
   );
 }
 
-function HomeHero({
+/**
+ * Home's hero, compact so the template gallery shows on the first screen
+ * (fix round 1): the engine's sample poster (or the latest video) as a 9:16
+ * picture on the left, with the VIDORA badge, and the approved headline,
+ * "Fotoğraf seç", the sample / resume links and the claim on the right. At
+ * most 45 % of the window height (compactHeroLayout); the column may grow
+ * past it at large text sizes.
+ */
+function CompactHero({
   clip,
   onOpen,
   onCreate,
   onSample,
   onResume,
+  playing,
 }: {
   clip?: Clip;
   onOpen?: () => void;
@@ -373,67 +382,41 @@ function HomeHero({
   onSample: () => void;
   /** Set only when a real draft exists; replaces the sample link. */
   onResume?: () => void;
+  /** False while the hero is scrolled out of view. */
+  playing: boolean;
 }) {
   const t = useT(),
     window = useWindowDimensions(),
-    insets = useSafeAreaInsets(),
-    tabInset = useTabBarInset();
-  // The hero keeps its 9:16 shape from the top edge; the sheet covers the
-  // rest, so it never needs more height than the window gives it.
-  const posterHeight = posterHeightFor(window.width, window.height);
-  // The sheet's height is only known after layout. Until then the hero layer
-  // is transparent (no frame at the wrong offset); afterwards it moves up by
-  // `offset` so the product clears the sheet, and follows every later change
-  // of the sheet (Dynamic Type, the resume row, the language) without a
-  // remount: only its `top` changes.
-  const [sheetHeight, setSheetHeight] = useState<number | null>(null);
-  const measured = sheetHeight !== null && sheetHeight > 0;
-  // The first layout can still carry a stale safe-area inset (iOS 26 native
-  // tabs); the layer shows only once the sheet height held still for a
-  // moment, so a late correction is never seen as a jump. It never hides again.
-  const [revealed, setRevealed] = useState(false);
-  useEffect(() => {
-    if (!measured) return;
-    const id = setTimeout(() => setRevealed(true), HERO_SETTLE_MS);
-    return () => clearTimeout(id);
-  }, [measured, sheetHeight]);
-  const geometry = {
-    posterHeight,
-    windowHeight: window.height,
-    sheetHeight: sheetHeight ?? 0,
+    insets = useSafeAreaInsets();
+  const layout = compactHeroLayout({
+    width: window.width,
+    height: window.height,
     safeTop: insets.top,
-  };
-  const offset = heroOffset(geometry);
-  const shown = photoFrame({ ...geometry, width: window.width });
-  // photoFrame is in window coordinates; the layer starts `offset` higher.
-  const photo = { ...shown, top: shown.top + offset };
+  });
+  const pw = layout.posterWidth,
+    ph = layout.posterHeight;
   return (
-    <View style={styles.home}>
-      <View
-        pointerEvents={revealed ? "auto" : "none"}
-        style={[
-          styles.homePoster,
-          {
-            width: window.width,
-            height: posterHeight,
-            top: -offset,
-            opacity: revealed ? 1 : 0,
-          },
-        ]}
-      >
+    <View
+      style={[
+        styles.compact,
+        { paddingTop: layout.top, minHeight: layout.heroHeight },
+      ]}
+    >
+      <View style={[styles.compactPoster, { width: pw, height: ph }]}>
         {clip ? (
           <ClipMedia
             key={clip.id}
             clip={clip}
-            width={window.width}
-            height={posterHeight}
+            width={pw}
+            height={ph}
+            playing={playing}
           />
         ) : (
           <PosterMedia
-            width={window.width}
-            height={posterHeight}
-            photo={photo}
-            diagTop={offset}
+            width={pw}
+            height={ph}
+            photo={{ top: 0, left: 0, width: pw, height: ph }}
+            diagTop={0}
           />
         )}
         {clip && onOpen ? (
@@ -445,59 +428,45 @@ function HomeHero({
               `Latest video: ${displayName(clip.name)}, ${spokenDuration(t, clip.duration)}. Open`,
             )}
             onPress={onOpen}
-            style={[
-              styles.homePoster,
-              { width: window.width, height: posterHeight },
-            ]}
+            style={StyleSheet.absoluteFill}
           />
         ) : null}
+        <View
+          accessible
+          accessibilityLabel={
+            clip ? t("Son videon", "Your latest video") : "Vidora"
+          }
+          pointerEvents="none"
+          style={styles.compactBadge}
+        >
+          <Text maxFontSizeMultiplier={POSTER_SCALE} style={styles.compactBadgeText}>
+            {clip ? t("SON VİDEON", "LATEST") : "VIDORA"}
+          </Text>
+        </View>
       </View>
-      <View
-        accessible
-        accessibilityLabel={
-          clip ? t("Son videon", "Your latest video") : "Vidora"
-        }
-        pointerEvents="none"
-        style={[styles.badge, { top: insets.top + BADGE_TOP }]}
-      >
-        <Text maxFontSizeMultiplier={POSTER_SCALE} style={styles.badgeText}>
-          {clip ? t("SON VİDEON", "LATEST") : "VIDORA"}
-        </Text>
-      </View>
-      <View
-        onLayout={(event) => {
-          const next = event.nativeEvent.layout.height;
-          setSheetHeight((prev) =>
-            prev !== null && Math.abs(prev - next) < 0.5 ? prev : next,
-          );
-        }}
-        style={[
-          styles.sheet,
-          { paddingBottom: sheetPaddingBottom(window.height, tabInset) },
-        ]}
-      >
+      <View style={styles.compactColumn}>
         <View accessible accessibilityRole="header">
           <Text
             numberOfLines={1}
             adjustsFontSizeToFit
             maxFontSizeMultiplier={POSTER_SCALE}
-            style={styles.headline}
+            style={styles.compactHeadline}
           >
             {t("BİR FOTOĞRAF.", "ONE PHOTO.")}
           </Text>
-          <View style={styles.block}>
-            <View pointerEvents="none" style={styles.blockFill} />
+          <View style={styles.compactBlock}>
+            <View pointerEvents="none" style={styles.compactBlockFill} />
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
               maxFontSizeMultiplier={POSTER_SCALE}
-              style={styles.headline}
+              style={styles.compactHeadline}
             >
               {t("BİR REKLAM.", "ONE AD.")}
             </Text>
           </View>
         </View>
-        <View style={styles.sheetButton}>
+        <View style={styles.compactButton}>
           <Button
             primary
             testID="home-create"
@@ -506,31 +475,30 @@ function HomeHero({
           />
         </View>
         {/* A real draft replaces the sample link; else the sample starts. */}
-        <View style={onResume ? styles.sheetLink : styles.sheetSample}>
-          {onResume ? (
-            <>
-              <Button
-                plain
-                testID="home-resume-draft"
-                label={t("Taslağına devam et", "Resume your draft")}
-                onPress={onResume}
-              />
-              <Button
-                plain
-                testID="home-sample"
-                label={t("Örnekle dene", "Try a sample")}
-                onPress={onSample}
-              />
-            </>
-          ) : (
+        {onResume ? (
+          <>
             <Button
-              testID="sample-try"
+              plain
+              testID="home-resume-draft"
+              label={t("Taslağına devam et", "Resume your draft")}
+              onPress={onResume}
+            />
+            <Button
+              plain
+              testID="home-sample"
               label={t("Örnekle dene", "Try a sample")}
               onPress={onSample}
             />
-          )}
-        </View>
-        <Text style={styles.claim}>
+          </>
+        ) : (
+          <Button
+            plain
+            testID="sample-try"
+            label={t("Örnekle dene", "Try a sample")}
+            onPress={onSample}
+          />
+        )}
+        <Text style={styles.compactClaim}>
           {t(
             "Önizleme ücretsiz. Video için Vidora Pro gerekir.",
             "Preview is free. Videos need Vidora Pro.",
@@ -727,6 +695,91 @@ export default function Studio() {
     sampleTapped.current = now;
     router.push({ pathname: "/create", params: { sample: "1" } });
   };
+  // The gallery under the compact hero is on the first screen: its first
+  // shelf draws posters right after mount, the others once the seller
+  // scrolls (`armed`). The hero video pauses while scrolled out of view.
+  const window = useWindowDimensions(),
+    insets = useSafeAreaInsets(),
+    tabInset = useTabBarInset();
+  const heroBottom = compactHeroLayout({
+    width: window.width,
+    height: window.height,
+    safeTop: insets.top,
+  }).heroHeight;
+  const [armed, setArmed] = useState(false);
+  const [heroVisible, setHeroVisible] = useState(true);
+  // Stable callbacks (through refs), so the memoised gallery never redraws
+  // its 30 cards when Home re-renders.
+  const routerNow = useRef(router);
+  routerNow.current = router;
+  // A card opens the photo library for as many photos as its recipe uses;
+  // nothing picked keeps Home. A recipe that needs more (Önce/Sonra: 2) asks
+  // for the rest and never starts short. One picker at a time.
+  const picking = useRef(false);
+  const pickVariant = useCallback(
+    async (variant: RecipeVariant) => {
+      if (picking.current) return;
+      picking.current = true;
+      try {
+        let photos = await pickProductPhotos(variant.recipe.maxPhotos);
+        if (photos.length === 0) return;
+        while (missingPhotos(variant.recipe, photos.length) > 0) {
+          const need = variant.recipe.minPhotos;
+          const more = await new Promise<boolean>((resolve) =>
+            Alert.alert(
+              t(
+                `Bu şablon için ${need} fotoğraf seç: önce ve sonra.`,
+                `Choose ${need} photos for this template: before and after.`,
+              ),
+              undefined,
+              [
+                {
+                  text: t("Vazgeç", "Cancel"),
+                  style: "cancel",
+                  onPress: () => resolve(false),
+                },
+                {
+                  text: t("Fotoğraf ekle", "Add photos"),
+                  onPress: () => resolve(true),
+                },
+              ],
+              { cancelable: true, onDismiss: () => resolve(false) },
+            ),
+          );
+          if (!more) return;
+          const added = await pickProductPhotos(
+            missingPhotos(variant.recipe, photos.length),
+          );
+          photos = photos
+            .concat(added.filter((uri) => !photos.includes(uri)))
+            .slice(0, variant.recipe.maxPhotos);
+        }
+        openEditor(routerNow.current, {
+          start: { variant: variant.id },
+          photos,
+        });
+      } catch (error) {
+        diag("gallery photo pick failed", { error });
+      } finally {
+        picking.current = false;
+      }
+    },
+    [t],
+  );
+  const onPickVariant = useCallback(
+    (variant: RecipeVariant) => void pickVariant(variant),
+    [pickVariant],
+  );
+  // "Örnekle dene" under a card: the same variant on the bundled sample.
+  const sampleVariant = useCallback((variant: RecipeVariant) => {
+    const now = Date.now();
+    if (now - sampleTapped.current < 1000) return;
+    sampleTapped.current = now;
+    routerNow.current.push({
+      pathname: "/create",
+      params: { sample: "1", variant: variant.id },
+    });
+  }, []);
   const openClip = (clip: Clip) => {
     if (deskOpenGuard("video:" + clip.id))
       router.push({ pathname: "/video", params: { id: clip.id } });
@@ -740,24 +793,45 @@ export default function Studio() {
     (width - 2 * Space.gutter - (columns - 1) * intentGap) / columns,
   );
 
-  // One layout: the full-bleed ad with its sheet (target b1-home); once there
-  // are videos, the hero shows the latest one.
+  // One layout: the compact hero (the approved ad and its two ways in; once
+  // there are videos, the latest one) and right under it the template
+  // gallery's shelves, the first one on the first screen.
   if (SINGLE_FLOW)
     return (
-      <HomeHero
-        clip={latest}
-        onOpen={latest ? () => openClip(latest) : undefined}
-        onCreate={create}
-        onSample={sample}
-        onResume={
-          draft
-            ? () =>
-                openEditor(router, {
-                  draft: { id: draft.id, sourceClip: draft.sourceClip },
-                })
-            : undefined
-        }
-      />
+      <ScrollView
+        style={styles.scroll}
+        contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={200}
+        onScroll={(event) => {
+          const y = event.nativeEvent.contentOffset.y;
+          // Same values bail out in React: no re-render while scrolling.
+          if (y > 24) setArmed(true);
+          setHeroVisible(y < heroBottom);
+        }}
+      >
+        <CompactHero
+          clip={latest}
+          onOpen={latest ? () => openClip(latest) : undefined}
+          onCreate={create}
+          onSample={sample}
+          playing={heroVisible}
+          onResume={
+            draft
+              ? () =>
+                  openEditor(router, {
+                    draft: { id: draft.id, sourceClip: draft.sourceClip },
+                  })
+              : undefined
+          }
+        />
+        <TemplateGallery
+          armed={armed}
+          bottomInset={tabInset}
+          onPick={onPickVariant}
+          onSample={sampleVariant}
+        />
+      </ScrollView>
     );
 
   return (
@@ -902,6 +976,59 @@ export default function Studio() {
 }
 
 const styles = StyleSheet.create({
+  scroll: { flex: 1, backgroundColor: Theme.bg },
+  compact: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 16,
+    paddingHorizontal: Space.gutter,
+    paddingBottom: 12,
+    backgroundColor: Theme.bg,
+  },
+  compactPoster: {
+    borderRadius: Radius.xl,
+    overflow: "hidden",
+    backgroundColor: Theme.surface,
+  },
+  compactBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: Theme.text,
+    borderRadius: Radius.s,
+    paddingHorizontal: 7,
+    paddingTop: 3,
+    paddingBottom: 2,
+  },
+  compactBadgeText: {
+    ...Type.display,
+    // 14/17 and 3 pt above line 1; the padding for the marks of İ is added
+    // on top of it (and taken back by marginTop), as for the big badge.
+    ...displayBox(14, 17, 3, POSTER_SCALE),
+    letterSpacing: 0.8,
+    color: Theme.bg,
+  },
+  compactColumn: { flex: 1, gap: 4 },
+  compactHeadline: { ...Type.display, ...displayMetrics(30, POSTER_SCALE) },
+  // As `block` below, scaled from 41 to 30 pt.
+  compactBlock: { alignSelf: "flex-start", marginTop: -2 },
+  compactBlockFill: {
+    position: "absolute",
+    top: -7,
+    bottom: 0,
+    left: -4,
+    right: -4,
+    backgroundColor: Theme.accent,
+  },
+  compactButton: { marginTop: Space.m },
+  compactClaim: {
+    ...Type.body,
+    fontFamily: Face.bold,
+    fontWeight: "700",
+    fontSize: 13,
+    lineHeight: 17,
+    color: Theme.muted,
+  },
   home: { flex: 1, backgroundColor: Theme.surface },
   homePoster: { position: "absolute", top: 0, left: 0 },
   // QA only (poster-diag): tiny and nearly transparent, still in the tree.

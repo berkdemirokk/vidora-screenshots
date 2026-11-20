@@ -15,7 +15,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_SCREENSHOT_MODE": "0",
-        "EXPO_PUBLIC_ACCOUNTS": "1"
+        "EXPO_PUBLIC_ACCOUNTS": "1",
+        "EXPO_PUBLIC_CLOUD_URL": "https://vidora-cloud.example.workers.dev"
       },
       "channel": "preview"
     },
@@ -24,7 +25,8 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SCREENSHOT_MODE": "0",
-        "EXPO_PUBLIC_ACCOUNTS": "1"
+        "EXPO_PUBLIC_ACCOUNTS": "1",
+        "EXPO_PUBLIC_CLOUD_URL": "https://vidora-cloud.example.workers.dev"
       },
       "channel": "production"
     }
