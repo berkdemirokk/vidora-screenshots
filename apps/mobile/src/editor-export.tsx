@@ -177,9 +177,15 @@ export function ExportPanel({
   proBadge,
   disabled,
   music,
+  ratioLocked = false,
+  category,
 }: {
   /** The beat chips ("Müzik"), shown first. */
   music?: ReactNode;
+  /** The product category control (single flow), shown after the beat. */
+  category?: ReactNode;
+  /** Recipes are 9:16 only: the shape chips are hidden, a line says why. */
+  ratioLocked?: boolean;
   ratio: AspectRatio;
   onRatio: (value: AspectRatio) => void;
   onStill?: (id: StillStyleId) => void;
@@ -200,20 +206,39 @@ export function ExportPanel({
       contentContainerStyle={styles.sheet}
     >
       {music}
+      {category ? (
+        <View style={styles.group}>
+          <PanelLabel>{t("Ürün kategorisi", "Product category")}</PanelLabel>
+          <View style={styles.buttons}>{category}</View>
+        </View>
+      ) : null}
       <View style={styles.group}>
         <PanelLabel>{t("Oran", "Shape")}</PanelLabel>
-        <ChipRow<AspectRatio>
-          label={t("Oran", "Shape")}
-          options={RATIOS.map((value) => ({
-            value,
-            label:
-              t(RATIO_NAMES[value].tr, RATIO_NAMES[value].en) + " " + value,
-          }))}
-          value={ratio}
-          onChange={onRatio}
-          disabled={disabled}
-          testIDFor={(value) => "ratio-" + value.replace(":", "-")}
-        />
+        {ratioLocked ? (
+          <Text
+            testID="ratio-locked"
+            maxFontSizeMultiplier={1.3}
+            style={[s.footnote, styles.note]}
+          >
+            {t(
+              "Bu şablon dikey (9:16) hazırlanır.",
+              "This template is made vertical (9:16).",
+            )}
+          </Text>
+        ) : (
+          <ChipRow<AspectRatio>
+            label={t("Oran", "Shape")}
+            options={RATIOS.map((value) => ({
+              value,
+              label:
+                t(RATIO_NAMES[value].tr, RATIO_NAMES[value].en) + " " + value,
+            }))}
+            value={ratio}
+            onChange={onRatio}
+            disabled={disabled}
+            testIDFor={(value) => "ratio-" + value.replace(":", "-")}
+          />
+        )}
       </View>
       {onStill && (
         <View style={styles.group}>
@@ -287,4 +312,5 @@ const styles = StyleSheet.create({
   sheet: { gap: Space.l, paddingTop: Space.s, paddingBottom: Space.l },
   group: { gap: Space.s },
   buttons: { gap: Space.s, paddingHorizontal: Space.gutter },
+  note: { paddingHorizontal: Space.gutter },
 });

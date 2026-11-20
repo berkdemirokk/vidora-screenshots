@@ -307,7 +307,11 @@ export function buildRecipeSpec(
   recipe: TemplateRecipe,
   input: RecipeInput,
 ): ProductVideoSpec {
-  if (input.photos.length < 1) throw new Error("recipe needs a photo");
+  const opening = input.opening?.uri || null;
+  // Only an AI picture and no photo: it is all there is to show.
+  const photos =
+    input.photos.length > 0 ? input.photos : opening ? [opening] : [];
+  if (photos.length < 1) throw new Error("recipe needs a photo");
   const recipeScenes = recipe.scenes.slice(0, MAX_SCENES);
   const beat = 60 / recipe.bpm;
   const starts = beatTimes(
@@ -329,11 +333,14 @@ export function buildRecipeSpec(
   /** Tone per built scene; only cut-out scenes keep one. */
   const sceneTones: (SceneTone | undefined)[] = [];
   const scenes: ProductScene[] = kept.map(({ rs, start }, i) => {
-    const n = input.photos.length;
-    const photo = input.photos[rs.slot % n];
-    const cutout = input.cutouts[rs.slot % n] ?? null;
-    const mode =
-      rs.mode === "cutout" && cutout
+    const n = photos.length;
+    // The AI opening is scene 0 only, full frame, never cut out.
+    const ai = i === 0 && !!opening;
+    const photo = ai ? (opening as string) : photos[rs.slot % n];
+    const cutout = ai ? null : (input.cutouts[rs.slot % n] ?? null);
+    const mode = ai
+      ? "photo"
+      : rs.mode === "cutout" && cutout
         ? "cutout"
         : rs.mode === "depth" && photo
           ? "depth"
@@ -433,7 +440,7 @@ export function buildRecipeSpec(
     sweeps: [],
     sparkles: null,
     texts: texts.slice(0, LIMITS.maxTexts),
-    watermark: false,
+    watermark: input.watermark === true,
     music: input.music ?? null,
     relief: 0,
     ratio: input.ratio,

@@ -8,7 +8,9 @@ import { YENI_KOLEKSIYON } from "./recipes/yeni-koleksiyon.ts";
 import {
   MAX_PHOTOS,
   capPhotos,
+  exportAllStep,
   guardAiScene,
+  photoRange,
   photosLeft,
   recipeSources,
   resolveMusicPattern,
@@ -57,7 +59,7 @@ test("an AI scene with containsProduct never gets a cut-out product overlay", ()
   assert.equal(guardAiScene(kept, old), kept);
   assert.equal(kept.scenes, undefined);
 
-  // Recipes: the AI picture is photo 0 without a cut-out.
+  // Recipes: the AI picture is the opening scene only, without a cut-out.
   for (const photos of [
     [{ source: PHOTO, cutout: { uri: CUT } }],
     [
@@ -76,11 +78,55 @@ test("an AI scene with containsProduct never gets a cut-out product overlay", ()
       ratio: "9:16",
       quality: "720p",
     });
-    assert.ok(r.scenes.every((s) => s.image !== CUT), "main cut-out never drawn");
     assert.ok(r.scenes.every((s) => s.image !== AI.uri || s.mode === "photo"));
     assert.equal(r.scenes[0].image, AI.uri);
+    assert.equal(r.scenes[0].mode, "photo");
+    assert.ok(r.scenes.slice(1).every((s) => s.image !== AI.uri), "AI only in scene 0");
     assert.deepEqual(specProblems(r), []);
   }
+});
+
+test("recipe sources keep the AI picture out of the photos", () => {
+  const photos = [{ source: PHOTO, cutout: { uri: CUT } }];
+  const src = recipeSources(photos, AI.uri);
+  assert.deepEqual(src.photos, [PHOTO]);
+  assert.deepEqual(src.cutouts, [CUT]);
+  assert.deepEqual(src.opening, { uri: AI.uri });
+  assert.equal(recipeSources(photos, null).opening, null);
+});
+
+test("photo range: a recipe's own min and max, else 1 to 8", () => {
+  assert.deepEqual(photoRange(null), { min: 1, max: MAX_PHOTOS });
+  assert.deepEqual(photoRange({ minPhotos: 2, maxPhotos: 2 }), { min: 2, max: 2 });
+  assert.deepEqual(photoRange({ minPhotos: 1, maxPhotos: 3 }), { min: 1, max: 3 });
+  assert.deepEqual(photoRange({ minPhotos: 0, maxPhotos: 20 }), { min: 1, max: 8 });
+  assert.equal(photosLeft(1, 3), 2);
+  assert.equal(photosLeft(3, 3), 0);
+  assert.equal(photosLeft(5, 3), 0);
+  assert.equal(photosLeft(1, 20), 7);
+});
+
+test("Hepsini çıkar: recipe 9:16 is the recipe, 4:5 and 1:1 are classic without the variant", () => {
+  const state = { ratio: "9:16", variant: "indirim-1", headline: "Gömlek" };
+  // Classic drafts: every shape classic, state as it was.
+  for (const ratio of ["9:16", "4:5", "1:1"]) {
+    const plan = exportAllStep({ ...state, variant: undefined }, ratio, false);
+    assert.equal(plan.recipe, false);
+    assert.equal(plan.saved.ratio, ratio);
+  }
+  const tall = exportAllStep(state, "9:16", true);
+  assert.equal(tall.recipe, true);
+  assert.equal(tall.saved.variant, "indirim-1", "Düzenle reopens the recipe");
+  for (const ratio of ["4:5", "1:1"]) {
+    const plan = exportAllStep(state, ratio, true);
+    assert.equal(plan.recipe, false);
+    assert.equal(plan.saved.ratio, ratio);
+    assert.ok(!("variant" in plan.saved), "Düzenle reopens the classic path");
+    assert.equal(plan.saved.musicPattern, "pulse", "the recipe's default beat");
+    assert.equal(state.variant, "indirim-1", "the editor's state is not changed");
+  }
+  assert.equal(exportAllStep({ ...state, musicPattern: "off" }, "4:5", true).saved.musicPattern, "off");
+  assert.equal(exportAllStep({ ...state, musicPattern: "pop" }, "1:1", true).saved.musicPattern, "pop");
 });
 
 test("the AI scene counts only while it is the background", () => {

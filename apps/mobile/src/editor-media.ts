@@ -3,11 +3,13 @@
  * native module here, so node --test runs it directly.
  */
 import type {
+  AspectRatio,
   ProductKey,
   ProductVideoSpec,
   SceneInput,
 } from "./product-templates.ts";
 import type { PatternId } from "./music/patterns.ts";
+import type { EditState } from "./drafts.ts";
 
 /** One video uses at most 8 photos (the main product plus 7). */
 export const MAX_PHOTOS = 8;
@@ -23,35 +25,40 @@ export function capPhotos<T>(photos: readonly T[]): T[] {
   return photos.slice(0, MAX_PHOTOS);
 }
 
-/** How many more photos fit next to `count`. */
-export function photosLeft(count: number): number {
-  return Math.max(0, MAX_PHOTOS - count);
+/** How many more photos fit next to `count` (at most `max`, default 8). */
+export function photosLeft(count: number, max: number = MAX_PHOTOS): number {
+  return Math.max(0, Math.min(max, MAX_PHOTOS) - count);
 }
 
 /**
  * The photo and cut-out lists for a recipe. An AI picture that already shows
- * the product takes photo 0 without a cut-out, so it is shown full frame and
- * the cut-out is never drawn over it.
+ * the product is the opening scene only (`opening`, full frame, no cut-out);
+ * it never goes into `photos`, so every other scene shows the seller's own
+ * photos (the price, the close-up, the end card, Önce/Sonra's "before").
  */
 export function recipeSources(
   photos: readonly EditorPhoto[],
   aiSceneUri: string | null,
-): { photos: string[]; cutouts: (string | null)[] } {
+): {
+  photos: string[];
+  cutouts: (string | null)[];
+  opening: { uri: string } | null;
+} {
   const list = capPhotos(photos);
-  const out = {
+  return {
     photos: list.map((p) => p.source),
     cutouts: list.map((p) => p.cutout?.uri ?? null),
+    opening: aiSceneUri ? { uri: aiSceneUri } : null,
   };
-  if (aiSceneUri) {
-    if (out.photos.length === 0) {
-      out.photos.push(aiSceneUri);
-      out.cutouts.push(null);
-    } else {
-      out.photos[0] = aiSceneUri;
-      out.cutouts[0] = null;
-    }
-  }
-  return out;
+}
+
+/** Photos a template takes: a recipe's own range, else 1 to MAX_PHOTOS. */
+export function photoRange(
+  recipe: { minPhotos: number; maxPhotos: number } | null | undefined,
+): { min: number; max: number } {
+  if (!recipe) return { min: 1, max: MAX_PHOTOS };
+  const max = Math.max(1, Math.min(MAX_PHOTOS, recipe.maxPhotos));
+  return { min: Math.max(1, Math.min(max, recipe.minPhotos)), max };
 }
 
 /** The AI picture already shows the product (AI Sahne's photo route). */
@@ -133,6 +140,29 @@ export function resolveMusicPattern(
   if (choice === "off") return null;
   if (choice) return choice;
   return recipe ? "pulse" : null;
+}
+
+/**
+ * One video of "Hepsini çıkar". In recipe mode the 9:16 video is the recipe
+ * itself (`recipe: true`, kept with its variant). 4:5 and 1:1 stay renders of
+ * the classic template: they are made from and saved with `saved`, which has
+ * no `variant` (Düzenle reopens them with the classic templates) and keeps
+ * the beat the seller heard (a recipe's default is Ritim 1).
+ */
+export function exportAllStep(
+  state: EditState,
+  ratio: AspectRatio,
+  recipe: boolean,
+): { recipe: boolean; saved: EditState } {
+  if (!recipe) return { recipe: false, saved: { ...state, ratio } };
+  if (ratio === "9:16") return { recipe: true, saved: { ...state, ratio } };
+  const saved: EditState = {
+    ...state,
+    ratio,
+    musicPattern: state.musicPattern ?? resolveMusicPattern(null, true) ?? "off",
+  };
+  delete saved.variant;
+  return { recipe: false, saved };
 }
 
 /** How long an added photo's cut-out may take before it is given up. */

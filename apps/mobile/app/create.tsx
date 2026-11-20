@@ -60,7 +60,9 @@ import {
 import {
   EXTRA_CUTOUT_TIMEOUT_MS,
   MAX_PHOTOS,
+  exportAllStep,
   guardAiScene,
+  photoRange,
   photosLeft,
   recipeSources,
   resolveMusicPattern,
@@ -265,6 +267,7 @@ import {
 } from "../src/studio/controls";
 import {
   BackgroundPanel,
+  CategoryMenu,
   FormatPanel,
   MusicPanel,
   TemplateChoicePanel,
@@ -1067,6 +1070,10 @@ export default function CreateProductVideo() {
     [variantId, classicChosen],
   );
   const isRecipe = !!recipeUsed && !!cutout;
+  /** Recipes are 9:16 only: the preview box, drafts and Düzenle use this. */
+  const shownRatio: AspectRatio = isRecipe ? "9:16" : ratio;
+  /** Photos the template takes (a recipe's own range, else 1 to 8). */
+  const photoLimits = photoRange(isRecipe ? recipeUsed?.recipe : null);
   /** The AI picture in use when it already shows the product (else null). */
   const aiScene = shownProductScene(scene, {
     ownActive: ownActive && !!ownBackdrop,
@@ -1086,7 +1093,8 @@ export default function CreateProductVideo() {
     if (!specInput) return null;
     if (recipePhotos && recipeUsed) {
       const built = buildRecipeSpec(recipeUsed.recipe, {
-        // An AI picture with the product is photo 1, full frame, no cut-out.
+        // An AI picture with the product is the opening scene only (full
+        // frame, no cut-out); every other scene uses the seller's photos.
         ...recipeSources(recipePhotos, aiScene?.uri ?? null),
         name: headline,
         price,
@@ -1099,6 +1107,7 @@ export default function CreateProductVideo() {
         ratio: "9:16",
         quality: effectiveQuality,
         music: specInput.music,
+        watermark: !isPro,
       }) as ProductVideoSpec & { ratio: AspectRatio };
       return built;
     }
@@ -1221,7 +1230,7 @@ export default function CreateProductVideo() {
             backdrop,
             ownBackdrop,
             ownActive,
-            ratio,
+            ratio: shownRatio,
             fontStyle,
             oldPrice,
             priceTag,
@@ -1270,7 +1279,7 @@ export default function CreateProductVideo() {
       backdrop,
       ownBackdrop,
       ownActive,
-      ratio,
+      shownRatio,
       fontStyle,
       oldPrice,
       priceTag,
@@ -1440,10 +1449,10 @@ export default function CreateProductVideo() {
       });
   }, [extras, cutout, isRecipe, busy, progress]);
 
-  /** "Fotoğraf ekle": more photos from the library, up to 8 in all. */
+  /** "Fotoğraf ekle": more photos, up to the recipe's own maximum (8 at most). */
   const addPhotos = () =>
     run(t("Fotoğraflar ekleniyor…", "Adding photos…"), async () => {
-      const left = photosLeft(1 + extrasNow.current.length);
+      const left = photosLeft(1 + extrasNow.current.length, photoLimits.max);
       if (left <= 0) return;
       const picked = await pickProductPhotos(left);
       if (!mounted.current || picked.length === 0) return;
@@ -1457,7 +1466,8 @@ export default function CreateProductVideo() {
   /** Remove added photo `index` (1..7 in the strip). */
   function removePhoto(index: number) {
     const gone = extras[index - 1];
-    if (!gone) return;
+    // Never below the recipe's minimum (Önce/Sonra keeps both photos).
+    if (!gone || 1 + extras.length <= photoLimits.min) return;
     // By identity: a second tap before the re-render removes nothing more.
     setExtras((list) => list.filter((p) => p !== gone));
     discardEditorFile(gone.source);
@@ -1916,8 +1926,11 @@ export default function CreateProductVideo() {
         flushSave();
         let finished = false;
         try {
-          // English users get an English template name (audit F20).
-          const info = templateById(template),
+          // English users get an English template name (audit F20); a recipe
+          // video is named after its variant (or recipe), not the classic one.
+          const info = isRecipe
+              ? (recipeUsed?.variant ?? recipeUsed?.recipe ?? templateById(template))
+              : templateById(template),
             name = t(info.tr, info.en);
           const fileName =
             (headline.trim() ? headline.trim() + " · " + name : name).slice(
@@ -2114,13 +2127,32 @@ export default function CreateProductVideo() {
   }
   function pickBackdrop(id: BackdropId) {
     lookTouched.current = true;
+    // A chosen AI scene goes with a backdrop pick: said, never silent.
+    if (scene)
+      setFlash(
+        t(
+          "Yapay zekâ sahnesi kaldırıldı, seçtiğin zemin kullanılıyor.",
+          "The AI scene was removed; your chosen backdrop is used.",
+        ),
+      );
     setBackdrop(id);
     setScene(null);
     setOwnActive(false);
     setStyleChosen(true);
   }
+  /** The own photo hides a kept AI scene (it comes back when the photo goes). */
+  function noteOwnOverScene() {
+    if (scene)
+      setFlash(
+        t(
+          "Yapay zekâ sahnesi yerine fotoğrafın kullanılıyor.",
+          "Your photo is used instead of the AI scene.",
+        ),
+      );
+  }
   function selectOwn() {
     if (!ownBackdrop) return;
+    noteOwnOverScene();
     setOwnActive(true);
     setStyleChosen(true);
   }
@@ -2177,6 +2209,7 @@ export default function CreateProductVideo() {
         offset: 0,
         text: textForImage(info),
       });
+      noteOwnOverScene();
       setOwnActive(true);
       setStyleChosen(true);
     });
@@ -2309,7 +2342,9 @@ export default function CreateProductVideo() {
   const exportAll = () => {
     if (!cutout || !editState) return;
     const state = editState,
-      cutoutUri = cutout.uri;
+      cutoutUri = cutout.uri,
+      // The recipe as the editor shows it (9:16 only): its 9:16 video.
+      recipeSpec = isRecipe ? spec : null;
     return run(t("Hepsi hazırlanıyor…", "Preparing everything…"), async () => {
       exportAllCancel.current = false;
       flushSave();
@@ -2324,12 +2359,22 @@ export default function CreateProductVideo() {
           EXPORT_ALL_STEPS,
           async (step: ExportStep) => {
             if (step.kind === "still") return saveStillStyle(step.still);
-            const videoSpec = await specFromState(state, cutoutUri, {
-              ratio: step.ratio,
-              quality: "1080p",
-              watermark: false,
-              lang: lng,
-            });
+            // Recipe mode: 9:16 is the recipe with its beat; 4:5 and 1:1 are
+            // classic renders saved without the variant.
+            const plan = exportAllStep(state, step.ratio, !!recipeSpec);
+            const videoSpec =
+              plan.recipe && recipeSpec
+                ? await withBeat({
+                    ...recipeSpec,
+                    quality: "1080p" as const,
+                    watermark: false,
+                  })
+                : await specFromState(plan.saved, cutoutUri, {
+                    ratio: step.ratio,
+                    quality: "1080p",
+                    watermark: false,
+                    lang: lng,
+                  });
             const clip = await renderProductVideo(
               videoSpec,
               (state.headline.trim() || t("Video", "Video")).slice(0, 50) +
@@ -2345,7 +2390,7 @@ export default function CreateProductVideo() {
               throw error;
             }
             try {
-              saveEdit(clip.id, { ...state, ratio: step.ratio }, cutoutUri);
+              saveEdit(clip.id, plan.saved, cutoutUri);
             } catch {
               // The video is in Photos and the Library; only Düzenle is lost.
             }
@@ -2720,7 +2765,7 @@ export default function CreateProductVideo() {
 
   // The preview as large as the stage allows, in the chosen shape, with
   // the transport row under it.
-  const aspect = aspectOf(ratio),
+  const aspect = aspectOf(shownRatio),
     inner = {
       width: stage.width - 2 * Space.l,
       height: stage.height - 2 * Space.s - TRANSPORT_HEIGHT - hintHeight,
@@ -2847,6 +2892,8 @@ export default function CreateProductVideo() {
       ]}
       onAdd={() => void addPhotos()}
       onRemove={removePhoto}
+      min={photoLimits.min}
+      max={photoLimits.max}
       disabled={locked}
     />
   );
@@ -2880,6 +2927,39 @@ export default function CreateProductVideo() {
     if (music) replaceMusic(null);
     setMusicChoice(value);
   }
+  /** "Yapay zekâ sahnesi" and "Sahneyi kaldır"; none without the cloud. */
+  const aiSceneButtons = cloudAvailable() ? (
+    <>
+      <Button
+        icon="photo.artframe"
+        label={
+          scene
+            ? t("Sahneyi değiştir", "Change scene")
+            : t("Yapay zekâ sahnesi", "AI scene")
+        }
+        disabled={locked}
+        onPress={() =>
+          router.push({
+            pathname: "/ai-studio",
+            params: {
+              cutout: cutout.uri,
+              width: String(cutout.width),
+              height: String(cutout.height),
+              category,
+            },
+          })
+        }
+      />
+      {scene && (
+        <Button
+          plain
+          label={t("Sahneyi kaldır", "Remove scene")}
+          disabled={locked}
+          onPress={() => setScene(null)}
+        />
+      )}
+    </>
+  ) : undefined;
   const beatChips = (
     <BeatChips
       value={music ? null : (beatPattern ?? "off")}
@@ -3259,7 +3339,28 @@ export default function CreateProductVideo() {
                 }
               />
             )}
-            {tool === "color" && (
+            {tool === "color" && isRecipe && (
+              // Recipes take their colours from the variant palette: only
+              // the AI scene (the opening scene) can change here.
+              <View testID="recipe-background" style={styles.recipeBackground}>
+                <Text
+                  maxFontSizeMultiplier={1.3}
+                  style={styles.recipeBackgroundText}
+                >
+                  {aiSceneButtons
+                    ? t(
+                        "Bu şablonun renkleri hazır gelir. Yapay zekâ sahnesi yalnızca açılışta görünür; diğer sahneler senin fotoğraflarınla kalır.",
+                        "This template comes with its own colours. The AI scene shows only at the opening; the other scenes keep your photos.",
+                      )
+                    : t(
+                        "Bu şablonun renkleri hazır gelir.",
+                        "This template comes with its own colours.",
+                      )}
+                </Text>
+                {aiSceneButtons}
+              </View>
+            )}
+            {tool === "color" && !isRecipe && (
               <BackgroundPanel
                 own={
                   ownBackdrop
@@ -3297,40 +3398,7 @@ export default function CreateProductVideo() {
                 palette={backdrop || scene || activeOwn ? null : palette}
                 onPalette={pickPalette}
                 disabled={locked}
-                scene={
-                  cloudAvailable() && cutout ? (
-                    <>
-                      <Button
-                        icon="photo.artframe"
-                        label={
-                          scene
-                            ? t("Sahneyi değiştir", "Change scene")
-                            : t("Yapay zekâ sahnesi", "AI scene")
-                        }
-                        disabled={locked}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/ai-studio",
-                            params: {
-                              cutout: cutout.uri,
-                              width: String(cutout.width),
-                              height: String(cutout.height),
-                              category,
-                            },
-                          })
-                        }
-                      />
-                      {scene && (
-                        <Button
-                          plain
-                          label={t("Sahneyi kaldır", "Remove scene")}
-                          disabled={locked}
-                          onPress={() => setScene(null)}
-                        />
-                      )}
-                    </>
-                  ) : undefined
-                }
+                scene={aiSceneButtons}
               />
             )}
             {tool === "text" && (
@@ -3409,7 +3477,17 @@ export default function CreateProductVideo() {
             {tool === "format" && SINGLE_FLOW && (
               <ExportPanel
                 music={beatChips}
-                ratio={ratio}
+                // SINGLE_FLOW has no Şablon category: text ideas, the listing
+                // text and AI Sahne's Manken styles follow this one.
+                category={
+                  <CategoryMenu
+                    category={category}
+                    onCategory={chooseCategory}
+                    disabled={locked}
+                  />
+                }
+                ratioLocked={isRecipe}
+                ratio={shownRatio}
                 onRatio={setRatio}
                 onStill={canSaveImage ? pressStillStyle : undefined}
                 onExportAll={canSaveImage ? pressExportAll : undefined}
@@ -3522,6 +3600,13 @@ export default function CreateProductVideo() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Theme.bg },
+  recipeBackground: {
+    gap: Space.s,
+    paddingHorizontal: Space.gutter,
+    paddingTop: Space.s,
+    paddingBottom: Space.l,
+  },
+  recipeBackgroundText: { fontSize: 13, lineHeight: 18, color: Theme.muted },
   stage: {
     flex: 1,
     alignItems: "center",

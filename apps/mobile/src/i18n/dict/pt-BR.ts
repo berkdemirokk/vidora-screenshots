@@ -1081,4 +1081,9 @@ export const ptBR: Readonly<Record<string, string>> = {
   "Yapay zekâ ürünü yeniden çizer; küçük farklar olabilir.": "A IA redesenha o produto; pequenas diferenças são possíveis.",
   "Manken · stüdyo": "Modelo · estúdio",
   "Manken · sokak": "Modelo · rua",
+  "Yapay zekâ sahnesi kaldırıldı, seçtiğin zemin kullanılıyor.": "A cena de IA foi removida; o fundo que você escolheu está sendo usado.",
+  "Yapay zekâ sahnesi yerine fotoğrafın kullanılıyor.": "Sua foto é usada no lugar da cena de IA.",
+  "Bu şablonun renkleri hazır gelir. Yapay zekâ sahnesi yalnızca açılışta görünür; diğer sahneler senin fotoğraflarınla kalır.": "Este modelo vem com as próprias cores. A cena de IA aparece só na abertura; as outras cenas mostram suas fotos.",
+  "Bu şablonun renkleri hazır gelir.": "Este modelo vem com as próprias cores.",
+  "Bu şablon dikey (9:16) hazırlanır.": "Este modelo é feito na vertical (9:16).",
 };

@@ -68,4 +68,12 @@ export type RecipeInput = {
   quality: ProductQuality;
   /** Optional music for the render; null or absent means none. */
   music?: { uri: string; volume: number } | null;
+  /**
+   * An AI picture that already shows the product: used ONLY for the opening
+   * scene (photo mode, full frame). Every other scene keeps the seller's own
+   * photos, so the price, close-up and end card always show the real product.
+   */
+  opening?: { uri: string } | null;
+  /** The "Vidora" mark for people without Pro (as the classic templates). */
+  watermark?: boolean;
 };

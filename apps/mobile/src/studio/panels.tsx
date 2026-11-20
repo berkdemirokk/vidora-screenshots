@@ -424,6 +424,71 @@ const choiceStyles = StyleSheet.create({
 export type TemplateMode = "looks" | "templates";
 
 /**
+ * The product category as a compact pull-down (the current name and a
+ * chevron) that opens the category sheet. Text ideas, the listing text and
+ * AI Sahne's styles (Manken for clothing) follow it.
+ */
+export function CategoryMenu({
+  category,
+  onCategory,
+  disabled,
+}: {
+  category: CategoryId;
+  onCategory: (id: CategoryId) => void;
+  disabled: boolean;
+}) {
+  const t = useT();
+  const current = CATEGORIES.find((item) => item.id === category);
+  const currentName = current ? t(current.tr, current.en) : "";
+  function openCategories() {
+    showActionSheet(
+      {
+        title: t("Ürün kategorisi", "Product category"),
+        message: t(
+          "Görünümler ve metin önerileri buna göre değişir.",
+          "The looks and text ideas follow it.",
+        ),
+        options: [
+          ...CATEGORIES.map((item) => t(item.tr, item.en)),
+          t("Vazgeç", "Cancel"),
+        ],
+        cancelButtonIndex: CATEGORIES.length,
+      },
+      (index) => {
+        const picked = CATEGORIES[index];
+        if (picked && picked.id !== category) {
+          tap("select");
+          onCategory(picked.id);
+        }
+      },
+    );
+  }
+  return (
+    <Pressable
+      testID="category-menu"
+      accessibilityRole="button"
+      accessibilityLabel={
+        t("Ürün kategorisi", "Product category") + ": " + currentName
+      }
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      hitSlop={{ top: 10, bottom: 10 }}
+      onPress={openCategories}
+      style={({ pressed }) => [
+        styles.categoryPull,
+        pressed && { opacity: 0.5 },
+        disabled && { opacity: 0.4 },
+      ]}
+    >
+      <Text maxFontSizeMultiplier={CHROME_SCALE} style={styles.categoryText}>
+        {currentName}
+      </Text>
+      <Icon name="chevron.down" size={13} color={Theme.text} />
+    </Pressable>
+  );
+}
+
+/**
  * The Şablon tool: a header with "Görünümler | Şablonlar" and the product
  * category, then one horizontal list. It opens on the current choice: the
  * caller decides the first segment once; it never switches by itself. Both
@@ -451,31 +516,6 @@ export function TemplatePanel({
   // The switch grows with the text (up to the chrome cap) so labels fit.
   const { fontScale } = useWindowDimensions();
   const [mode, setMode] = useState<TemplateMode>(() => initialMode);
-  const current = CATEGORIES.find((item) => item.id === category);
-  const currentName = current ? t(current.tr, current.en) : "";
-  function openCategories() {
-    showActionSheet(
-      {
-        title: t("Ürün kategorisi", "Product category"),
-        message: t(
-          "Görünümler ve metin önerileri buna göre değişir.",
-          "The looks and text ideas follow it.",
-        ),
-        options: [
-          ...CATEGORIES.map((item) => t(item.tr, item.en)),
-          t("Vazgeç", "Cancel"),
-        ],
-        cancelButtonIndex: CATEGORIES.length,
-      },
-      (index) => {
-        const picked = CATEGORIES[index];
-        if (picked && picked.id !== category) {
-          tap("select");
-          onCategory(picked.id);
-        }
-      },
-    );
-  }
   return (
     <ScrollView
       style={{ maxHeight: space }}
@@ -501,30 +541,11 @@ export function TemplatePanel({
             onChange={setMode}
           />
         </View>
-        <Pressable
-          testID="category-menu"
-          accessibilityRole="button"
-          accessibilityLabel={
-            t("Ürün kategorisi", "Product category") + ": " + currentName
-          }
-          accessibilityState={{ disabled }}
+        <CategoryMenu
+          category={category}
+          onCategory={onCategory}
           disabled={disabled}
-          hitSlop={{ top: 10, bottom: 10 }}
-          onPress={openCategories}
-          style={({ pressed }) => [
-            styles.categoryPull,
-            pressed && { opacity: 0.5 },
-            disabled && { opacity: 0.4 },
-          ]}
-        >
-          <Text
-            maxFontSizeMultiplier={CHROME_SCALE}
-            style={styles.categoryText}
-          >
-            {currentName}
-          </Text>
-          <Icon name="chevron.down" size={13} color={Theme.text} />
-        </Pressable>
+        />
       </View>
       <ListActive.Provider value={mode === "looks"}>
         <View style={mode === "looks" ? undefined : styles.hidden}>

@@ -52,10 +52,16 @@ const GALLERY_REVISION = 1;
 const POSTER_WIDTH = 360;
 /**
  * The native build number: a new build (renderer change) draws posters
- * again even when the app version stays. expo-application is not installed,
- * so it is read from the app config.
+ * again even when the app version stays. eas.json uses appVersionSource
+ * "remote" with autoIncrement, so app.json's ios.buildNumber ("1") never
+ * changes; the binary's own CFBundleVersion (Constants.platform.ios) is the
+ * real one. expo-application is not installed. An OTA that changes recipes
+ * still bumps GALLERY_REVISION (same binary, same build number).
  */
-const buildNumber = Constants.expoConfig?.ios?.buildNumber ?? "0";
+const buildNumber =
+  Constants.platform?.ios?.buildNumber ??
+  Constants.expoConfig?.ios?.buildNumber ??
+  "0";
 const VERSION =
   `${Constants.expoConfig?.version ?? "0"}b${buildNumber}r${GALLERY_REVISION}`.replace(
     /[^a-zA-Z0-9.]/g,

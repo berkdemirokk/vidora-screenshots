@@ -13,6 +13,9 @@
     },
     "preview": {
       "distribution": "internal",
+      "ios": {
+        "image": "latest"
+      },
       "env": {
         "EXPO_PUBLIC_SCREENSHOT_MODE": "0",
         "EXPO_PUBLIC_ACCOUNTS": "1",
@@ -23,6 +26,9 @@
     "production": {
       "distribution": "store",
       "autoIncrement": true,
+      "ios": {
+        "image": "latest"
+      },
       "env": {
         "EXPO_PUBLIC_SCREENSHOT_MODE": "0",
         "EXPO_PUBLIC_ACCOUNTS": "1",

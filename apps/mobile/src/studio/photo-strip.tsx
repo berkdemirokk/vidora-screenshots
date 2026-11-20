@@ -43,6 +43,8 @@ export function PhotoStrip({
   onRemove,
   disabled,
   note,
+  min = 1,
+  max = MAX_PHOTOS,
 }: {
   photos: readonly StripPhoto[];
   onAdd: () => void;
@@ -50,9 +52,14 @@ export function PhotoStrip({
   onRemove: (index: number) => void;
   disabled: boolean;
   note?: string | null;
+  /** Fewest photos the template needs: no remove buttons at this count. */
+  min?: number;
+  /** Most photos the template takes: no "Fotoğraf ekle" at this count. */
+  max?: number;
 }) {
   const t = useT();
-  const left = MAX_PHOTOS - photos.length;
+  const left = Math.min(max, MAX_PHOTOS) - photos.length;
+  const canRemove = photos.length > min;
   return (
     <View>
       <ScrollView
@@ -88,7 +95,7 @@ export function PhotoStrip({
                 </View>
               )}
             </View>
-            {index > 0 && (
+            {index > 0 && canRemove && (
               <Pressable
                 testID={"photo-remove-" + (index + 1)}
                 accessibilityRole="button"

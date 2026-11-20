@@ -1080,4 +1080,9 @@ export const it: Readonly<Record<string, string>> = {
   "Yapay zekâ ürünü yeniden çizer; küçük farklar olabilir.": "L’IA ridisegna il prodotto; sono possibili piccole differenze.",
   "Manken · stüdyo": "Modello · studio",
   "Manken · sokak": "Modello · strada",
+  "Yapay zekâ sahnesi kaldırıldı, seçtiğin zemin kullanılıyor.": "La scena IA è stata rimossa; viene usato lo sfondo che hai scelto.",
+  "Yapay zekâ sahnesi yerine fotoğrafın kullanılıyor.": "Viene usata la tua foto al posto della scena IA.",
+  "Bu şablonun renkleri hazır gelir. Yapay zekâ sahnesi yalnızca açılışta görünür; diğer sahneler senin fotoğraflarınla kalır.": "Questo modello ha i suoi colori. La scena IA appare solo all'inizio; le altre scene mostrano le tue foto.",
+  "Bu şablonun renkleri hazır gelir.": "Questo modello ha i suoi colori.",
+  "Bu şablon dikey (9:16) hazırlanır.": "Questo modello viene creato in verticale (9:16).",
 };

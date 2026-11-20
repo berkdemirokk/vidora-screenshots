@@ -1090,4 +1090,9 @@ export const de: Readonly<Record<string, string>> = {
   "Yapay zekâ ürünü yeniden çizer; küçük farklar olabilir.": "Die KI zeichnet das Produkt neu; kleine Abweichungen sind möglich.",
   "Manken · stüdyo": "Model · Studio",
   "Manken · sokak": "Model · Straße",
+  "Yapay zekâ sahnesi kaldırıldı, seçtiğin zemin kullanılıyor.": "Die KI-Szene wurde entfernt; dein gewählter Hintergrund wird verwendet.",
+  "Yapay zekâ sahnesi yerine fotoğrafın kullanılıyor.": "Dein Foto wird statt der KI-Szene verwendet.",
+  "Bu şablonun renkleri hazır gelir. Yapay zekâ sahnesi yalnızca açılışta görünür; diğer sahneler senin fotoğraflarınla kalır.": "Diese Vorlage bringt ihre eigenen Farben mit. Die KI-Szene erscheint nur am Anfang; die anderen Szenen zeigen deine Fotos.",
+  "Bu şablonun renkleri hazır gelir.": "Diese Vorlage bringt ihre eigenen Farben mit.",
+  "Bu şablon dikey (9:16) hazırlanır.": "Diese Vorlage wird im Hochformat (9:16) erstellt.",
 };
