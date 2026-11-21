@@ -243,6 +243,7 @@ const FONT_WIDTH: Record<FontStyle, number> = {
   modern: 1.25,
   system: 1.25,
   poster: 1.45,
+  script: 1.1,
 };
 
 function charEm(c: string): number {
@@ -630,6 +631,7 @@ export function buildRecipeSpec(
       ...rt.style,
       ...colours,
     };
+    if (built.font === "script") built.tracking = 0;
     texts.push(built);
     fields.push(rt.field);
     if (tone === "split") splitTexts.add(built);

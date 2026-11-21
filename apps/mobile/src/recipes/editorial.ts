@@ -15,6 +15,7 @@ import {
   type ProductVideoSpec,
   type SceneTransition,
   type TextAnimation,
+  trackingFor,
 } from "../product-templates.ts";
 import {
   estimateLines,
@@ -441,12 +442,14 @@ const LOOKBOOK: EditorialCut = {
     start: 0.2,
     end: 1.25,
     y: 0.68,
-    font: "editorial",
+    // Handwritten accent: a normal name fits one line, a long one wraps to
+    // two (never upper case, never letter-spaced).
+    font: "script",
     weight: "bold",
-    tracking: 0.08,
-    width: 0.6,
-    max: 0.1,
-    min: 0.07,
+    tracking: 0,
+    width: 0.64,
+    max: 0.12,
+    min: 0.075,
     animation: "fade",
     exit: "fade",
   },
@@ -677,7 +680,7 @@ export function buildEditorialSpec(
       animation: style.animation,
       exit: style.exit,
       font: style.font,
-      tracking: style.tracking,
+      tracking: trackingFor(style.font, style.tracking),
     };
   };
   const texts: ProductText[] = [];

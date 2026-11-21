@@ -344,3 +344,23 @@ test("gallery: the Editoryal shelf shows the 5 cuts, each with its poster and ro
     /"editorial-cut-" \+ cut\.id/,
   );
 });
+
+test("Lookbook title is script: tracking 0, one line for a normal name, two for a long one", () => {
+  const cut = byId("lookbook");
+  assert.equal(cut.title.font, "script");
+  for (const ratio of RATIOS) {
+    const short = build({ ratio }, cut).texts[0];
+    assert.equal(short.font, "script");
+    assert.equal(short.tracking, 0);
+    assert.equal(short.text, "Lavanta Yağı");
+    assert.equal(estimateLines(short.text, short.size, "script", 0), 1);
+    const longName = "Organik soğuk sıkım lavanta yağı, cam damlalıklı şişe 50 ml";
+    const long = build({ ratio, name: longName }, cut).texts[0];
+    assert.equal(long.text, longName);
+    assert.ok(estimateLines(long.text, long.size, "script", 0) <= 2);
+    assert.deepEqual(specProblems(build({ ratio, name: longName }, cut)), []);
+  }
+  // The other cuts keep their own families.
+  for (const id of ["signature", "ritim", "detay"])
+    assert.notEqual(build({}, byId(id)).texts[0].font, "script");
+});

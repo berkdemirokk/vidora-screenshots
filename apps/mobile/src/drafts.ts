@@ -58,6 +58,7 @@ const FONT_IDS = [
   "editorial",
   "impact",
   "poster",
+  "script",
 ] as const satisfies readonly FontStyle[];
 const PALETTE_IDS = [
   "noir",

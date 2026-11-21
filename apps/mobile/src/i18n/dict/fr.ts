@@ -359,6 +359,7 @@ export const fr: Readonly<Record<string, string>> = {
   düzenlendi: "modifié",
   Düzenleyici: "Éditeur",
   Editoryal: "Éditorial",
+  "El yazısı": "Manuscrite",
   "Ekle ({0})": "Ajouter ({0})",
   Elektronik: "Électronique",
   "EN AVANTAJLI": "MEILLEURE OFFRE",

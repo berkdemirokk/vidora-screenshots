@@ -71,6 +71,11 @@ const FONTS: License = {
       copyright:
         "Copyright 2017 The Archivo Black Project Authors (https://github.com/Omnibus-Type/ArchivoBlack)",
     },
+    {
+      name: "Dancing Script",
+      copyright:
+        'Copyright 2016 The Dancing Script Project Authors (https://github.com/googlefonts/DancingScript), with Reserved Font Name "Dancing Script"',
+    },
   ],
   license: "SIL Open Font License 1.1",
   summary: OFL_SUMMARY,

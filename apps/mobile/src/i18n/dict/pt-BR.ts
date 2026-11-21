@@ -353,6 +353,7 @@ export const ptBR: Readonly<Record<string, string>> = {
   düzenlendi: "editado",
   Düzenleyici: "Editor",
   Editoryal: "Editorial",
+  "El yazısı": "Manuscrita",
   "Ekle ({0})": "Adicionar ({0})",
   Elektronik: "Eletrônicos",
   "EN AVANTAJLI": "MELHOR OFERTA",

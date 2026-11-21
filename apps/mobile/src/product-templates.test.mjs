@@ -1,5 +1,6 @@
 // Run with: node --test apps/mobile/src/*.test.mjs
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   DEFAULT_FONT_STYLE,
@@ -486,7 +487,7 @@ test("minimal uses small, widely spaced capitals", () => {
 test("font style: per-template default, override, sans pairing and sizes", () => {
   assert.deepEqual(
     FONT_STYLES.map((f) => f.tr),
-    ["Modern", "Zarif", "Editoryal", "Güçlü", "Afiş", "Sade"],
+    ["Modern", "Zarif", "Editoryal", "Güçlü", "Afiş", "El yazısı", "Sade"],
   );
   const show = buildSpec(full);
   const headline = show.texts.find((t) => t.text === full.headline);
@@ -1563,4 +1564,30 @@ test("fallback error text per context, never raw system text", () => {
     const { tr, en } = fallbackErrorText(context);
     assert.ok(!tr.includes("(") && !en.includes("("), context);
   }
+});
+
+test("script family: valid, never upper case, tracking 0, sample face", () => {
+  assert.equal(FONT_SAMPLE_FAMILY.script, "DancingScript-Regular");
+  assert.ok(FONT_SIZE_FACTOR.script > 1);
+  for (const template of TEMPLATES) {
+    const spec = buildSpec({ ...full, template: template.id, fontStyle: "script" });
+    assert.deepEqual(specProblems(spec), [], template.id);
+    for (const t of spec.texts.filter((x) => x.font === "script")) {
+      assert.equal(t.tracking, 0, template.id + " " + t.text);
+      for (const w of [full.headline, full.store])
+        assert.notEqual(t.text, upperFor(w, "tr"), template.id + " " + t.text);
+    }
+  }
+  const bad = buildSpec({ ...full, template: "minimal", fontStyle: "script" });
+  assert.ok(bad.texts.some((t) => t.font === "script" && t.text === full.headline));
+  assert.deepEqual(
+    specProblems({ ...bad, texts: [{ ...bad.texts[0], font: "nope" }] }).length > 0,
+    true,
+  );
+});
+
+test("script family: Dancing Script is credited with its OFL notice", () => {
+  const src = readFileSync(new URL("./licenses.ts", import.meta.url), "utf8");
+  assert.match(src, /name: "Dancing Script"/);
+  assert.match(src, /Copyright 2016 The Dancing Script Project Authors/);
 });

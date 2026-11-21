@@ -354,6 +354,7 @@ export const it: Readonly<Record<string, string>> = {
   düzenlendi: "modificato",
   Düzenleyici: "Editor",
   Editoryal: "Editoriale",
+  "El yazısı": "Corsivo",
   "Ekle ({0})": "Aggiungi ({0})",
   Elektronik: "Elettronica",
   "EN AVANTAJLI": "MIGLIOR OFFERTA",

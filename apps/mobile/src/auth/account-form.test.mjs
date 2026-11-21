@@ -598,7 +598,7 @@ test("added copy is complete in both languages and hides nothing it should not s
   assert.doesNotMatch(secondsText(COPY.resetResendWait, 45, "en"), /\{n\}/);
   // The legal block: notice and consent are separate texts, with the contact and no marketing consent.
   for (const lang of ["tr", "en"]) {
-    assert.match(LEGAL_COPY.notice[lang], /support@example.com/);
+    assert.match(LEGAL_COPY.notice[lang], /support@example\.com/);
     assert.match(LEGAL_COPY.notice[lang], /Firebase/);
     assert.match(LEGAL_COPY.consent[lang], /Firebase/);
     assert.doesNotMatch(

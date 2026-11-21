@@ -98,10 +98,17 @@ export type TextAnimation = "rise" | "fade" | "pop" | "slide";
 /**
  * Type families for video texts (bundled OFL fonts, with Turkish letters):
  * modern = Manrope, elegant = Playfair Display, editorial = Cormorant
- * Garamond, impact = Anton, poster = Archivo Black, system = SF.
+ * Garamond, impact = Anton, poster = Archivo Black, script = Dancing Script
+ * (handwritten: never upper case, never letter-spaced), system = SF.
  */
 export type FontStyle =
-  "system" | "modern" | "elegant" | "editorial" | "impact" | "poster";
+  | "system"
+  | "modern"
+  | "elegant"
+  | "editorial"
+  | "impact"
+  | "poster"
+  | "script";
 export const FONT_STYLES: readonly { id: FontStyle; tr: string; en: string }[] =
   [
     { id: "modern", tr: "Modern", en: "Modern" },
@@ -109,11 +116,13 @@ export const FONT_STYLES: readonly { id: FontStyle; tr: string; en: string }[] =
     { id: "editorial", tr: "Editoryal", en: "Editorial" },
     { id: "impact", tr: "Güçlü", en: "Bold" },
     { id: "poster", tr: "Afiş", en: "Poster" },
+    { id: "script", tr: "El yazısı", en: "Script" },
     { id: "system", tr: "Sade", en: "Plain" },
   ];
 /**
  * Optical size per family, so the same `size` reads about as large: Anton is
- * tall and condensed, Archivo Black wide, Cormorant has a small x-height.
+ * tall and condensed, Archivo Black wide, Cormorant has a small x-height,
+ * Dancing Script an even smaller one (about 0.38 em against Manrope's 0.55).
  */
 export const FONT_SIZE_FACTOR: Record<FontStyle, number> = {
   system: 1,
@@ -122,6 +131,7 @@ export const FONT_SIZE_FACTOR: Record<FontStyle, number> = {
   editorial: 1.12,
   impact: 0.9,
   poster: 0.86,
+  script: 1.18,
 };
 /**
  * PostScript name of each family's sample face (the bold cut the renderer
@@ -134,7 +144,16 @@ export const FONT_SAMPLE_FAMILY: Record<FontStyle, string | undefined> = {
   editorial: "CormorantGaramond-Bold",
   impact: "Anton-Regular",
   poster: "ArchivoBlack-Regular",
+  script: "DancingScript-Regular",
 };
+
+/**
+ * Letter spacing a family allows: script letters are connected, so any
+ * spacing breaks them (the native renderer ignores it as well).
+ */
+export function trackingFor(font: FontStyle | undefined, tracking: number | undefined): number | undefined {
+  return font === "script" ? 0 : tracking;
+}
 
 export type ProductText = {
   text: string;
@@ -979,6 +998,14 @@ const TYPE_METRICS: Record<
     space: 0.333,
     kern: 0.01,
   },
+  script: {
+    line: 1.2 * 1.03,
+    upper: 0.62,
+    lower: 0.4,
+    digit: 0.51,
+    space: 0.26,
+    kern: 0,
+  },
 };
 
 /** Widest line the renderer allows, in frame widths. */
@@ -1028,7 +1055,7 @@ function wrapText(t: ProductText): { lines: number; widest: number } {
 
 /** Width of a text's drawn box (with its pill or padding), in frame widths. */
 export function textWidth(t: ProductText): number {
-  const pad = t.fill ? 0.7 * t.size : 4 / 720;
+  const pad = t.fill ? 0.7 * t.size : t.font === "script" ? Math.max(4 / 720, 0.15 * t.size) : 4 / 720;
   return wrapText(t).widest + 2 * pad;
 }
 
@@ -2602,7 +2629,12 @@ function buildSpecOnce<R extends FrameRatio>(
   // Type: the chosen family for display texts; serif styles pair with the
   // sans for pills and calls to action. Sizes get the family's optical factor.
   const uiFont: FontStyle =
-    fontStyle === "elegant" || fontStyle === "editorial" ? "modern" : fontStyle;
+    fontStyle === "elegant" || fontStyle === "editorial" || fontStyle === "script"
+      ? "modern"
+      : fontStyle;
+  // Script is never upper case: undo the templates' upper-casing for it.
+  const plain = new Map<string, string>();
+  for (const s of [headline, store, cta]) if (s) plain.set(upper(s), s);
   const tagged = input.priceTag
     ? applyPriceTag(texts, input.priceTag, price, oldPrice, palette)
     : texts;
@@ -2614,6 +2646,9 @@ function buildSpecOnce<R extends FrameRatio>(
         : fontStyle);
     return {
       ...t,
+      ...(font === "script"
+        ? { text: plain.get(t.text) ?? t.text, tracking: 0 }
+        : {}),
       font,
       size: Math.min(0.2, t.size * FONT_SIZE_FACTOR[font]),
     };
