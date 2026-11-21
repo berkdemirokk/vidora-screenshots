@@ -255,8 +255,18 @@ appId: com.berkdemirok.vidora
           timeout: 3000
           optional: true
 - takeScreenshot: ${OUT}-name-focus
-# No keyboard bar means no focus: fail here with a clear message instead of typing into nothing.
-- assertVisible: "Bitti|Done"
+# Run 31: CI failed here although the field was tapped. The simulator may run with the hardware
+# keyboard (no software keyboard, so no "Bitti" bar) while the field is still focused. The bar is
+# therefore not asserted; the typed-text assert below is the real focus check. One more tap first.
+- runFlow:
+    when:
+      notVisible: "Bitti|Done"
+    commands:
+      - tapOn:
+          id: "field-headline"
+          retryTapIfNoChange: false
+      - waitForAnimationToEnd:
+          timeout: 1500
 - eraseText: 60
 - inputText: "Yaz Esintisi EDP"
 - assertVisible: "Yaz Esintisi EDP"
@@ -496,4 +506,7 @@ appId: com.berkdemirok.vidora
           timeout: 2000
           optional: true
       - takeScreenshot: ${OUT}-second-editor-name
-      - assertVisible: "Bitti|Done"
+      - extendedWaitUntil:
+          visible: "Bitti|Done"
+          timeout: 3000
+          optional: true

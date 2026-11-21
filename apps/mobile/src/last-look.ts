@@ -76,3 +76,37 @@ export async function saveLastLook(
     // Remembering the look is a convenience only.
   }
 }
+
+const CATEGORY_KEY = "lastCategory";
+
+/** A stored category id, or null when it is missing or unknown. */
+export function parseLastCategory<T extends string>(
+  raw: string | null | undefined,
+  valid: readonly T[],
+): T | null {
+  return valid.find((id) => id === raw) ?? null;
+}
+
+/**
+ * The category of the last video (preselected when the editorial video asks
+ * for one); null when none is stored or it is unknown. Best effort.
+ */
+export async function loadLastCategory<T extends string>(
+  valid: readonly T[],
+): Promise<T | null> {
+  try {
+    const SecureStore = await import("expo-secure-store");
+    return parseLastCategory(await SecureStore.getItemAsync(CATEGORY_KEY), valid);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveLastCategory(id: string): Promise<void> {
+  try {
+    const SecureStore = await import("expo-secure-store");
+    await SecureStore.setItemAsync(CATEGORY_KEY, id);
+  } catch {
+    // Remembering the category is a convenience only.
+  }
+}

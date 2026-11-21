@@ -143,26 +143,18 @@ export function resolveMusicPattern(
 }
 
 /**
- * One video of "Hepsini çıkar". In recipe mode the 9:16 video is the recipe
- * itself (`recipe: true`, kept with its variant). 4:5 and 1:1 stay renders of
- * the classic template: they are made from and saved with `saved`, which has
- * no `variant` (Düzenle reopens them with the classic templates) and keeps
- * the beat the seller heard (a recipe's default is Ritim 1).
+ * One video of "Hepsini çıkar". In recipe and editorial modes (`recipe`)
+ * every shape is that video itself, built in the shape (`recipe: true`);
+ * otherwise a classic render. Either way it is saved with `saved`: the
+ * state in that shape, keeping `variant` / `editorial` and the AI shots, so
+ * Düzenle reopens the same video in the same shape.
  */
 export function exportAllStep(
   state: EditState,
   ratio: AspectRatio,
   recipe: boolean,
 ): { recipe: boolean; saved: EditState } {
-  if (!recipe) return { recipe: false, saved: { ...state, ratio } };
-  if (ratio === "9:16") return { recipe: true, saved: { ...state, ratio } };
-  const saved: EditState = {
-    ...state,
-    ratio,
-    musicPattern: state.musicPattern ?? resolveMusicPattern(null, true) ?? "off",
-  };
-  delete saved.variant;
-  return { recipe: false, saved };
+  return { recipe, saved: { ...state, ratio } };
 }
 
 /** How long an added photo's cut-out may take before it is given up. */

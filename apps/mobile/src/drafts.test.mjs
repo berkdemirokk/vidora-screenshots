@@ -419,3 +419,36 @@ test("an old draft (no variant, no photo) is unchanged", () => {
   assert.equal("photo" in parsed, false);
   assert.equal(serializeDraft(parsed), raw, "byte-identical");
 });
+
+test("an editorial draft keeps its mode and AI shots (missing ones stay null)", () => {
+  const a1 = ID + ".a1.jpg",
+    a3 = ID + ".a3.jpg";
+  const editorial = { ...draft, editorial: true, aiShots: [a1, null, a3] };
+  const raw = serializeDraft(editorial);
+  const parsed = parseDraft(raw, ID);
+  assert.equal(parsed.editorial, true);
+  assert.deepEqual(parsed.aiShots, [a1, null, a3]);
+  assert.equal(serializeDraft(parsed), raw, "byte-identical");
+  // Paths, URIs, wrong slots and odd modes are dropped; no shot at all: no field.
+  const odd = parseDraft(
+    JSON.stringify({
+      ...JSON.parse(raw),
+      editorial: "yes",
+      aiShots: ["../x.jpg", "file:///cache/a.jpg", ID + ".a9.jpg", a1],
+    }),
+    ID,
+  );
+  assert.equal("editorial" in odd, false);
+  assert.equal("aiShots" in odd, false);
+  const none = parseDraft(serializeDraft({ ...draft, editorial: true, aiShots: [null, null, null] }), ID);
+  assert.equal(none.editorial, true);
+  assert.equal("aiShots" in none, false);
+});
+
+test("an old draft has no editorial fields and stays byte-identical", () => {
+  const raw = serializeDraft(draft);
+  const json = JSON.parse(raw);
+  assert.equal("editorial" in json, false);
+  assert.equal("aiShots" in json, false);
+  assert.equal(serializeDraft(parseDraft(raw, ID)), raw);
+});

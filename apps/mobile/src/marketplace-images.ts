@@ -135,3 +135,17 @@ export function stillStyleById(id: StillStyleId): StillStyle {
 /** Quality a preset starts at when the user has not picked one. */
 export const presetQuality = (preset: string): "720p" | "1080p" =>
   preset === "trendyol" ? "720p" : "1080p";
+
+/** Phones with less RAM than this (the 3 GB models) start at 720p. */
+export const LOW_MEMORY_BYTES = 3.5 * 1024 ** 3;
+
+/**
+ * The quality a video starts at on this phone: 720p when `memoryBytes`
+ * (deviceMemoryBytes) is under LOW_MEMORY_BYTES, else `base`. Null (builds
+ * without the native check) keeps `base`.
+ */
+export const deviceQuality = (
+  base: "720p" | "1080p",
+  memoryBytes: number | null,
+): "720p" | "1080p" =>
+  memoryBytes !== null && memoryBytes < LOW_MEMORY_BYTES ? "720p" : base;

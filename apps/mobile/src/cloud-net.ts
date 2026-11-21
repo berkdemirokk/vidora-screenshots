@@ -4,10 +4,13 @@
  */
 import {
   CloudError,
+  SHOT_STYLES,
   errorFromResponse,
   quotaFromHeaders,
+  shotFields,
   type CloudQuota,
 } from "./cloud-rules.ts";
+import type { CategoryId } from "./product-catalog";
 
 export type SceneAnswer = { jpeg: Uint8Array; quota: CloudQuota | null };
 
@@ -54,14 +57,27 @@ export async function postForJpeg(
     }
     let jpeg: Uint8Array;
     try {
-      jpeg = new Uint8Array(await guard(response.arrayBuffer()));
+      // New worker: JSON { image: base64 } (no CPU-heavy decode on the Free
+      // plan). Old worker: raw image bytes.
+      if ((get("content-type") ?? "").includes("application/json")) {
+        const body: unknown = await guard(response.json());
+        const image = (body as { image?: unknown } | null)?.image;
+        if (typeof image !== "string") throw new CloudError("failed");
+        jpeg = Uint8Array.from(atob(image), (c) => c.charCodeAt(0));
+      } else {
+        jpeg = new Uint8Array(await guard(response.arrayBuffer()));
+      }
     } catch (error) {
       if (error instanceof CloudError) throw error;
+      // atob/json parse failures are a bad answer, not a network problem.
+      if (error instanceof SyntaxError || (error as Error)?.name === "InvalidCharacterError")
+        throw new CloudError("failed");
       throw new CloudError(timedOut ? "upstream-failed" : "offline");
     }
-    // A JPEG starts FF D8 FF; anything else is not a usable answer.
-    if (jpeg.length < 1000 || jpeg[0] !== 0xff || jpeg[1] !== 0xd8)
-      throw new CloudError("failed");
+    // JPEG starts FF D8 FF, PNG 89 50 4E 47; anything else is not usable.
+    const jpegSig = jpeg[0] === 0xff && jpeg[1] === 0xd8 && jpeg[2] === 0xff;
+    const pngSig = jpeg[0] === 0x89 && jpeg[1] === 0x50 && jpeg[2] === 0x4e && jpeg[3] === 0x47;
+    if (jpeg.length < 1000 || !(jpegSig || pngSig)) throw new CloudError("failed");
     return { jpeg, quota: quotaFromHeaders(get) };
   } finally {
     clearTimeout(timer);
@@ -92,4 +108,33 @@ export async function collectScenes<T>(
     }
   }
   return { scenes, quota };
+}
+
+/**
+ * The editorial video's 3 shots (context, hand, macro), one request each,
+ * in order; `onStep(i)` before shot i. Only the first `count` are asked
+ * for (what is left of today's allowance); the rest stay null. The first
+ * failure stops: shots made before it stay (they used today's allowance),
+ * the rest are null, and the error comes back for the note. `post` returns
+ * the saved file's URI.
+ */
+export async function requestShots(
+  category: CategoryId | null,
+  post: (fields: Record<string, string>, index: number) => Promise<string>,
+  onStep?: (index: number) => void,
+  count: number = SHOT_STYLES.length,
+): Promise<{ ai: (string | null)[]; error: CloudError | null }> {
+  const ai: (string | null)[] = [null, null, null];
+  for (let i = 0; i < Math.min(count, SHOT_STYLES.length); i++) {
+    onStep?.(i);
+    try {
+      ai[i] = await post(shotFields(SHOT_STYLES[i], category), i);
+    } catch (error) {
+      return {
+        ai,
+        error: error instanceof CloudError ? error : new CloudError("failed"),
+      };
+    }
+  }
+  return { ai, error: null };
 }

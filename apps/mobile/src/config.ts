@@ -47,6 +47,15 @@ export const QA_QUALITY: "720p" | "1080p" | null =
 export const QA_RECIPE = process.env.EXPO_PUBLIC_QA_RECIPE === "1";
 
 /**
+ * QA only (`EXPO_PUBLIC_QA_EDITORIAL=1` at bundle time): Home's "Örnekle
+ * dene" opens the editorial video on its bundled sample (no network), so the
+ * simulator run can render it. Production reaches it through Home's
+ * Editoryal card (`editorial` route param). Never set for App Store /
+ * TestFlight builds (not in any eas.json profile), so it is always false there.
+ */
+export const QA_EDITORIAL = process.env.EXPO_PUBLIC_QA_EDITORIAL === "1";
+
+/**
  * True in the simulator QA build (either QA switch above): a slow machine, so
  * the render stall watchdog waits longer. Always false in store builds.
  */

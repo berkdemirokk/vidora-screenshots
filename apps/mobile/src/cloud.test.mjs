@@ -336,6 +336,28 @@ test("two scenes: second fails -> first kept, error and its quota returned", asy
   assert.equal(all.error, undefined);
 });
 
+const jsonResponse = (image) => ({
+  ok: true,
+  status: 200,
+  headers: { get: (n) => (n === "content-type" ? "application/json" : null) },
+  json: async () => ({ image }),
+});
+const b64 = (bytes) => Buffer.from(bytes).toString("base64");
+
+test("post: JSON base64 answer is decoded; bad payloads fail", async () => {
+  const ok = await postForJpeg(async () => jsonResponse(b64(okJpeg())), "https://x", {}, 1000);
+  assert.equal(ok.jpeg.length, 2000);
+  assert.equal(ok.jpeg[0], 0xff);
+  const png = new Uint8Array(2000);
+  png.set([0x89, 0x50, 0x4e, 0x47]);
+  assert.equal((await postForJpeg(async () => jsonResponse(b64(png)), "https://x", {}, 1000)).jpeg[0], 0x89);
+  for (const bad of [b64(new Uint8Array(2000)), "!!!not base64!!!", undefined, 5])
+    await assert.rejects(
+      postForJpeg(async () => jsonResponse(bad), "https://x", {}, 1000),
+      (e) => e.code === "failed",
+    );
+});
+
 test("post: success returns JPEG and quota; error body maps to a code", async () => {
   const ok = await postForJpeg(async () => okResponse(5), "https://x", {}, 1000);
   assert.equal(ok.jpeg.length, 2000);

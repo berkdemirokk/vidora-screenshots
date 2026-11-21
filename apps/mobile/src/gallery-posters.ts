@@ -5,6 +5,9 @@
  *
  *   Library/Caches/vidora-gallery/<variantId>-<rev>.jpg
  *
+ * The Editoryal card's poster ("editorial-<rev>.jpg") is drawn the same way
+ * from the editorial video's bundled sample (editorial-sample.ts).
+ *
  * `rev` holds the app version, the native build number, GALLERY_REVISION and
  * the copy language. Posters are drawn POSTER_WIDTH pixels wide with the
  * native batch call (`frames`, one time); builds without it use `frame`
@@ -24,8 +27,10 @@ import sampleProduct from "../assets/sample-product.jpg";
 import { baseLang } from "./i18n/lang";
 import { specProblems, type ProductVideoSpec } from "./product-templates";
 import { buildRecipeSpec } from "./recipes/build";
+import { buildEditorialSpec } from "./recipes/editorial";
+import { editorialSample } from "./editorial-sample";
 import type { RecipeVariant } from "./recipes";
-import { galleryPosterTime } from "./gallery";
+import { tonedPosterTime } from "./gallery";
 import { isStaleError, nativePreviewQueue } from "./native-queue";
 import { diag } from "./diag";
 import { SAMPLE_COPY, getSampleCutout } from "./sample-frames";
@@ -47,7 +52,7 @@ type NativeFrames = {
 const native = requireOptionalNativeModule<NativeFrames>("KareviaProduct");
 
 /** Bump when the gallery posters change (moments, copy, recipes). */
-const GALLERY_REVISION = 1;
+const GALLERY_REVISION = 2;
 /** Pixel width of a poster: cards are 132 pt wide (about 400 px at 3x). */
 const POSTER_WIDTH = 360;
 /**
@@ -96,9 +101,10 @@ export function pruneGalleryPosters(): void {
   }
 }
 
-function posterFile(variant: RecipeVariant, lang: "tr" | "en"): File {
+/** `id` is a variant id, or "editorial" for the Editoryal card. */
+function posterFile(id: string, lang: "tr" | "en"): File {
   const rev = revOf(lang);
-  return new File(galleryDir(), `${variant.id}-${rev}.jpg`);
+  return new File(galleryDir(), `${id}-${rev}.jpg`);
 }
 
 /**
@@ -137,12 +143,9 @@ async function drawPoster(
 const pending = new Map<string, Promise<string | null>>();
 
 /** The poster already on disk, without drawing; null when there is none. */
-function cachedGalleryPoster(
-  variant: RecipeVariant,
-  lang: "tr" | "en",
-): string | null {
+function cachedGalleryPoster(id: string, lang: "tr" | "en"): string | null {
   try {
-    const file = posterFile(variant, lang);
+    const file = posterFile(id, lang);
     // Read from disk each time: "delete all data" may have removed it.
     if (file.exists) return file.uri;
   } catch {
@@ -159,20 +162,58 @@ async function samplePhoto(): Promise<string> {
   return uri;
 }
 
-/** Draw (or reuse) a variant's poster; null when it cannot be drawn. */
-export function galleryPoster(
-  variant: RecipeVariant,
+/**
+ * Draw (or reuse) poster `id`: `make` builds the spec and the moment; null
+ * when it cannot be drawn.
+ */
+function drawnPoster(
+  id: string,
   lang: "tr" | "en",
+  make: () => Promise<{ spec: ProductVideoSpec; at: number }>,
 ): Promise<string | null> {
-  const cached = cachedGalleryPoster(variant, lang);
+  const cached = cachedGalleryPoster(id, lang);
   if (cached) return Promise.resolve(cached);
-  const dest = posterFile(variant, lang);
+  const dest = posterFile(id, lang);
   const running = pending.get(dest.uri);
   if (running) return running;
   const job = (async () => {
     if (!native?.frames && !native?.frame) return null;
     const dir = galleryDir();
     if (!dir.exists) dir.create({ intermediates: true, idempotent: true });
+    const { spec, at } = await make();
+    const problems = specProblems(spec);
+    if (problems.length > 0) throw new Error("spec: " + problems.join(", "));
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const uri = await nativePreviewQueue.enqueue(
+          () => drawPoster(spec, at, dest),
+          "idle",
+        );
+        return uri;
+      } catch (error) {
+        if (!isStaleError(error) || attempt >= TRIES) throw error;
+        await wait(500 * attempt);
+      }
+    }
+  })()
+    .catch((error: unknown) => {
+      diag("gallery poster failed", {
+        variant: id,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    })
+    .finally(() => pending.delete(dest.uri));
+  pending.set(dest.uri, job);
+  return job;
+}
+
+/** Draw (or reuse) a variant's poster; null when it cannot be drawn. */
+export function galleryPoster(
+  variant: RecipeVariant,
+  lang: "tr" | "en",
+): Promise<string | null> {
+  return drawnPoster(variant.id, lang, async () => {
     const [{ cutout }, photo] = await Promise.all([
       getSampleCutout(),
       samplePhoto(),
@@ -190,32 +231,66 @@ export function galleryPoster(
       ratio: "9:16",
       quality: "720p",
     });
-    const problems = specProblems(spec);
-    if (problems.length > 0) throw new Error("spec: " + problems.join(", "));
-    const at = galleryPosterTime(variant.recipe.id, spec.duration);
-    for (let attempt = 1; ; attempt++) {
-      try {
-        const uri = await nativePreviewQueue.enqueue(
-          () => drawPoster(spec, at, dest),
-          "idle",
-        );
-        return uri;
-      } catch (error) {
-        if (!isStaleError(error) || attempt >= TRIES) throw error;
-        await wait(500 * attempt);
-      }
+    // A toned scene, so each variant shows its own palette.
+    return { spec, at: tonedPosterTime(variant.recipe, spec) };
+  });
+}
+
+/** The Editoryal card's moment: the closing hero shot with name and price. */
+export const EDITORIAL_POSTER_TIME = 12.2;
+
+/** Draw (or reuse) the Editoryal card's poster from the bundled sample. */
+function editorialPoster(lang: "tr" | "en"): Promise<string | null> {
+  return drawnPoster("editorial", lang, async () => {
+    const sample = await editorialSample();
+    const copy = SAMPLE_COPY[lang];
+    const spec = buildEditorialSpec({
+      ai: sample.ai,
+      photos: sample.photos,
+      cutouts: sample.photos.map(() => null),
+      name: copy.headline,
+      price: copy.price,
+      palette: "blush",
+      music: null,
+      watermark: false,
+      quality: "720p",
+    });
+    return { spec, at: EDITORIAL_POSTER_TIME };
+  });
+}
+
+/** A poster URI for `id` that follows `draw` (see useGalleryPoster). */
+function usePoster(
+  id: string,
+  enabled: boolean,
+  draw: (lang: "tr" | "en") => Promise<string | null>,
+): string | null {
+  const { lang: appLang } = useContext(Language);
+  // The sample copy exists in Turkish and English only.
+  const lang = baseLang(appLang);
+  const key = `${id}|${lang}`;
+  const [state, setState] = useState(() => ({
+    key,
+    uri: cachedGalleryPoster(id, lang),
+  }));
+  useEffect(() => {
+    const cached = cachedGalleryPoster(id, lang);
+    if (cached || !enabled) {
+      setState((now) =>
+        now.key === key && now.uri === cached ? now : { key, uri: cached },
+      );
+      return;
     }
-  })()
-    .catch((error: unknown) => {
-      diag("gallery poster failed", {
-        variant: variant.id,
-        reason: error instanceof Error ? error.message : String(error),
-      });
-      return null;
-    })
-    .finally(() => pending.delete(dest.uri));
-  pending.set(dest.uri, job);
-  return job;
+    let live = true;
+    void draw(lang).then((uri) => {
+      if (live) setState({ key, uri });
+    });
+    return () => {
+      live = false;
+    };
+    // `draw` is fixed per id (a constant list, or the one editorial poster).
+  }, [key, enabled]);
+  return state.key === key ? state.uri : null;
 }
 
 /**
@@ -228,30 +303,10 @@ export function useGalleryPoster(
   variant: RecipeVariant,
   enabled: boolean,
 ): string | null {
-  const { lang: appLang } = useContext(Language);
-  // The sample copy exists in Turkish and English only.
-  const lang = baseLang(appLang);
-  const key = `${variant.id}|${lang}`;
-  const [state, setState] = useState(() => ({
-    key,
-    uri: cachedGalleryPoster(variant, lang),
-  }));
-  useEffect(() => {
-    const cached = cachedGalleryPoster(variant, lang);
-    if (cached || !enabled) {
-      setState((now) =>
-        now.key === key && now.uri === cached ? now : { key, uri: cached },
-      );
-      return;
-    }
-    let live = true;
-    void galleryPoster(variant, lang).then((uri) => {
-      if (live) setState({ key, uri });
-    });
-    return () => {
-      live = false;
-    };
-    // `variant` is fixed per id (VARIANTS is a constant list).
-  }, [key, enabled]);
-  return state.key === key ? state.uri : null;
+  return usePoster(variant.id, enabled, (lang) => galleryPoster(variant, lang));
+}
+
+/** The Editoryal card's poster (same rules as useGalleryPoster). */
+export function useEditorialPoster(enabled: boolean): string | null {
+  return usePoster("editorial", enabled, editorialPoster);
 }

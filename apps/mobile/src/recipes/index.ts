@@ -8,7 +8,7 @@ import { INDIRIM } from "./indirim.ts";
 import { KOMBIN } from "./kombin.ts";
 import { KUTU_ACILISI } from "./kutu-acilisi.ts";
 import { ONCE_SONRA } from "./once-sonra.ts";
-import type { TemplateRecipe } from "./types.ts";
+import type { RecipeText, TemplateRecipe } from "./types.ts";
 import { URUN_DETAYLARI } from "./urun-detaylari.ts";
 import { YENI_KOLEKSIYON } from "./yeni-koleksiyon.ts";
 
@@ -128,4 +128,17 @@ export const VARIANTS: readonly RecipeVariant[] = RECIPES.flatMap((recipe) =>
 
 export function variantById(id: string): RecipeVariant | undefined {
   return VARIANTS.find((v) => v.id === id);
+}
+
+/**
+ * The Metin fields a mode uses: the editorial video shows name and price, a
+ * recipe the fields its texts name; null for the classic templates (all).
+ */
+export function usedTextFields(
+  recipe: TemplateRecipe | null | undefined,
+  editorial: boolean,
+): RecipeText["field"][] | null {
+  if (editorial) return ["name", "price"];
+  if (!recipe) return null;
+  return [...new Set(recipe.texts.map((t) => t.field))];
 }

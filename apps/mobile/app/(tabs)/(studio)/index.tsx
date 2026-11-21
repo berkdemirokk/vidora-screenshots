@@ -780,6 +780,32 @@ export default function Studio() {
       params: { sample: "1", variant: variant.id },
     });
   }, []);
+  // The Editoryal card: up to 8 photos, then the editor in editorial mode
+  // (it asks the cloud for the AI shots); nothing picked keeps Home.
+  const pickEditorial = useCallback(async () => {
+    if (picking.current) return;
+    picking.current = true;
+    try {
+      const photos = await pickProductPhotos(8);
+      if (photos.length === 0) return;
+      openEditor(routerNow.current, { start: { editorial: "1" }, photos });
+    } catch (error) {
+      diag("gallery photo pick failed", { error });
+    } finally {
+      picking.current = false;
+    }
+  }, []);
+  const onPickEditorial = useCallback(() => void pickEditorial(), [pickEditorial]);
+  // Its "Örnekle dene": the editorial video on the bundled sample shots.
+  const sampleEditorial = useCallback(() => {
+    const now = Date.now();
+    if (now - sampleTapped.current < 1000) return;
+    sampleTapped.current = now;
+    routerNow.current.push({
+      pathname: "/create",
+      params: { sample: "1", editorial: "1" },
+    });
+  }, []);
   const openClip = (clip: Clip) => {
     if (deskOpenGuard("video:" + clip.id))
       router.push({ pathname: "/video", params: { id: clip.id } });
@@ -830,6 +856,8 @@ export default function Studio() {
           bottomInset={tabInset}
           onPick={onPickVariant}
           onSample={sampleVariant}
+          onEditorial={onPickEditorial}
+          onEditorialSample={sampleEditorial}
         />
       </ScrollView>
     );

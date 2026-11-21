@@ -106,7 +106,7 @@ test("photo range: a recipe's own min and max, else 1 to 8", () => {
   assert.equal(photosLeft(1, 20), 7);
 });
 
-test("Hepsini çıkar: recipe 9:16 is the recipe, 4:5 and 1:1 are classic without the variant", () => {
+test("Hepsini çıkar: recipe and editorial videos are themselves in every shape, saved with their fields", () => {
   const state = { ratio: "9:16", variant: "indirim-1", headline: "Gömlek" };
   // Classic drafts: every shape classic, state as it was.
   for (const ratio of ["9:16", "4:5", "1:1"]) {
@@ -114,19 +114,19 @@ test("Hepsini çıkar: recipe 9:16 is the recipe, 4:5 and 1:1 are classic withou
     assert.equal(plan.recipe, false);
     assert.equal(plan.saved.ratio, ratio);
   }
-  const tall = exportAllStep(state, "9:16", true);
-  assert.equal(tall.recipe, true);
-  assert.equal(tall.saved.variant, "indirim-1", "Düzenle reopens the recipe");
-  for (const ratio of ["4:5", "1:1"]) {
+  const shots = ["file:///a1.jpg", null, "file:///a3.jpg"];
+  for (const ratio of ["9:16", "4:5", "1:1"]) {
     const plan = exportAllStep(state, ratio, true);
-    assert.equal(plan.recipe, false);
+    assert.equal(plan.recipe, true, ratio);
     assert.equal(plan.saved.ratio, ratio);
-    assert.ok(!("variant" in plan.saved), "Düzenle reopens the classic path");
-    assert.equal(plan.saved.musicPattern, "pulse", "the recipe's default beat");
-    assert.equal(state.variant, "indirim-1", "the editor's state is not changed");
+    assert.equal(plan.saved.variant, "indirim-1", "Düzenle reopens the recipe");
+    assert.ok(!("musicPattern" in plan.saved), "the recipe's own beat stays the default");
+    const ed = exportAllStep({ ratio: "9:16", editorial: true, aiShots: shots }, ratio, true);
+    assert.equal(ed.saved.editorial, true, "Düzenle reopens the editorial video");
+    assert.deepEqual(ed.saved.aiShots, shots);
+    assert.equal(ed.saved.ratio, ratio);
   }
-  assert.equal(exportAllStep({ ...state, musicPattern: "off" }, "4:5", true).saved.musicPattern, "off");
-  assert.equal(exportAllStep({ ...state, musicPattern: "pop" }, "1:1", true).saved.musicPattern, "pop");
+  assert.equal(state.ratio, "9:16", "the editor's state is not changed");
 });
 
 test("the AI scene counts only while it is the background", () => {

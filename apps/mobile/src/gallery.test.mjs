@@ -14,6 +14,7 @@ import {
   canStartVariant,
   compactHeroLayout,
   galleryPosterTime,
+  tonedPosterTime,
   galleryShelves,
   missingPhotos,
   parsePhotosParam,
@@ -238,7 +239,7 @@ test("Home: gallery cards are plain Pressables that pick photos first", () => {
   // Posters: cached by variant id and revision, drawn lazily.
   const posters = read("./gallery-posters.ts");
   assert.match(posters, /"vidora-gallery"/);
-  assert.match(posters, /`\$\{variant\.id\}-\$\{rev\}/);
+  assert.match(posters, /`\$\{id\}-\$\{rev\}/);
   assert.match(posters, /nativePreviewQueue\.enqueue\(/);
   // Fix round 1: small posters, build number in the key, prune after mount.
   assert.match(posters, /POSTER_WIDTH = 360/);
@@ -265,4 +266,42 @@ test("Home: stable gallery callbacks, Önce/Sonra asks for 2 photos, compact her
   // A card whose recipe needs 2 photos offers no one-photo sample.
   const gallery = read("./studio/template-gallery.tsx");
   assert.match(gallery, /card\.minPhotos <= 1 \?/);
+});
+
+test("variant posters show a toned scene in the variant's palette, with a text on screen", () => {
+  for (const v of VARIANTS) {
+    const spec = buildRecipeSpec(v.recipe, {
+      photos: ["file:///p.jpg"],
+      cutouts: ["file:///c.png"],
+      name: "Lavanta Yağı",
+      price: "349 TL",
+      oldPrice: "449 TL",
+      badge: "Yeni sezon",
+      cta: "Hemen al",
+      palette: v.palette,
+      ratio: "9:16",
+      quality: "720p",
+    });
+    const at = tonedPosterTime(v.recipe, spec);
+    assert.ok(at > 0 && at < spec.duration, v.id);
+    if (v.recipe.id === "once-sonra") {
+      // No toned scene: the recipe's own moment.
+      assert.equal(at, galleryPosterTime(v.recipe.id, spec.duration), v.id);
+      continue;
+    }
+    const k = spec.scenes.findLastIndex((s) => s.start <= at);
+    const scene = spec.scenes[k];
+    assert.equal(scene.mode, "cutout", v.id);
+    assert.ok(["accent", "split", "dark"].includes(v.recipe.scenes[k].tone), `${v.id} tone ${v.recipe.scenes[k].tone}`);
+    assert.ok(scene.background, v.id + " palette background");
+    // A text shows too, when any toned scene has one (Kombin's dark scene has none).
+    const tonedText = spec.scenes.some((s, i) => {
+      const end = spec.scenes[i + 1]?.start ?? spec.duration;
+      return s.background && v.recipe.scenes[i].tone !== "light" && spec.texts.some((t) => t.start < end && t.end > s.start);
+    });
+    if (tonedText) assert.ok(spec.texts.some((t) => t.start <= at && t.end > at), v.id + " a text shows");
+  }
+  const posters = read("./gallery-posters.ts");
+  assert.match(posters, /at: tonedPosterTime\(variant\.recipe, spec\)/);
+  assert.match(posters, /const GALLERY_REVISION = 2;/);
 });

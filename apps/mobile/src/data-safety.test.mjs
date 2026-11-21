@@ -540,3 +540,37 @@ test("photo 1's original photo is stored with the draft and comes back", () => {
   assert.equal("photo" in plain.draft, false);
   assert.equal("variant" in plain.draft, false);
 });
+
+test("editorial AI shots are stored with the draft and come back as cache copies", () => {
+  fresh();
+  const shot = (n) => {
+    const uri = `file:///cache/vidora-ai-scene-0000000${n}.jpg`;
+    fs.files.set(uri, "jpeg-" + n);
+    return uri;
+  };
+  const s1 = shot(1),
+    s3 = shot(3);
+  store.saveDraft(meta(), state({ editorial: true, aiShots: [s1, null, s3] }), cutout());
+  assert.ok(exists(`drafts/${ID}.a1.jpg`));
+  assert.equal(exists(`drafts/${ID}.a2.jpg`), false);
+  assert.ok(exists(`drafts/${ID}.a3.jpg`));
+  const opened = store.loadDraft(ID);
+  assert.equal(opened.draft.editorial, true);
+  const [r1, r2, r3] = opened.draft.aiShots;
+  assert.ok(r1.startsWith("file:///cache/vidora-ai-scene-"));
+  assert.equal(fs.files.get(r1), "jpeg-1");
+  assert.equal(r2, null);
+  assert.equal(fs.files.get(r3), "jpeg-3");
+  // Saved again from the copies: same stored files.
+  store.saveDraft(meta(), state({ editorial: true, aiShots: opened.draft.aiShots }), opened.cutoutUri);
+  assert.ok(exists(`drafts/${ID}.a1.jpg`));
+  // A stored shot deleted meanwhile opens as null (own photos take its place).
+  fs.files.delete(`${MEDIA}/drafts/${ID}.a3.jpg`);
+  assert.deepEqual(store.loadDraft(ID).draft.aiShots.map((u) => u === null), [false, true, true]);
+  // A re-shoot with fewer shots removes the stored copies the JSON no longer names.
+  store.saveDraft(meta(), state({ editorial: true, aiShots: [null, null, null] }), opened.cutoutUri);
+  assert.equal(exists(`drafts/${ID}.a1.jpg`), false);
+  const plain = store.loadDraft(ID);
+  assert.equal(plain.draft.editorial, true);
+  assert.equal("aiShots" in plain.draft, false);
+});

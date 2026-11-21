@@ -46,12 +46,20 @@ on:
           - ""
           - "1"
         default: ""
+      qa_editorial:
+        description: "QA only: Home's sample opens the editorial video on its bundled shots (EXPO_PUBLIC_QA_EDITORIAL=1); empty = off"
+        type: choice
+        options:
+          - ""
+          - "1"
+        default: ""
       flow:
-        description: "Maestro flow to run: qa-flow.yaml (default) or qa-recipe.yaml (one recipe render + save)"
+        description: "Maestro flow to run: qa-flow.yaml (default), qa-recipe.yaml (one recipe render + save) or qa-editorial.yaml (editorial sample render + save; needs qa_editorial)"
         type: choice
         options:
           - qa-flow.yaml
           - qa-recipe.yaml
+          - qa-editorial.yaml
         default: qa-flow.yaml
 
 jobs:
@@ -64,6 +72,7 @@ jobs:
       EXPO_PUBLIC_ACCOUNTS: "1"   # optional e-mail accounts are on in production; QA tests what ships
       EXPO_PUBLIC_QA_QUALITY: ${{ inputs.qa_quality }}
       EXPO_PUBLIC_QA_RECIPE: ${{ inputs.qa_recipe }}
+      EXPO_PUBLIC_QA_EDITORIAL: ${{ inputs.qa_editorial }}
       CI: "1"
       MAESTRO_DRIVER_STARTUP_TIMEOUT: "600000"
       MAESTRO_CLI_NO_ANALYTICS: "1"

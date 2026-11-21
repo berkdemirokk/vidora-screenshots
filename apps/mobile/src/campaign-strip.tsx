@@ -100,7 +100,13 @@ export function CampaignStrip({
   onPriceTag,
   risk,
   disabled,
+  badges = true,
+  priceTags = true,
 }: {
+  /** The text (badge) presets; off when the video shows no badge. */
+  badges?: boolean;
+  /** The price tag layouts; off where the template ignores them (recipes). */
+  priceTags?: boolean;
   badge: string;
   onBadge: (value: string) => void;
   headline: string;
@@ -124,46 +130,50 @@ export function CampaignStrip({
     preset !== null || priceTag !== null || seasons.some(seasonOn);
   return (
     <View style={styles.wrap}>
-      <ChipLine caption={t("Yazı", "Text")}>
-        {CAMPAIGN_PRESETS.map((item) => (
-          <Chip
-            key={item.id}
-            testID={item.testID}
-            label={presetText(item, lang)}
-            selected={preset === item.id}
-            disabled={disabled}
-            onPress={() =>
-              onBadge(preset === item.id ? "" : presetText(item, lang))
-            }
-          />
-        ))}
-        {seasons.map((set) => (
-          <Chip
-            key={set.id}
-            testID={set.testID}
-            label={set.label}
-            selected={seasonOn(set)}
-            disabled={disabled}
-            onPress={() => {
-              if (seasonOn(set)) return onBadge("");
-              onBadge(set.badge);
-              if (!headline.trim()) onHeadline(set.headline);
-            }}
-          />
-        ))}
-      </ChipLine>
-      <ChipLine caption={t("Fiyat", "Price")}>
-        {PRICE_TAGS.map((tag) => (
-          <Chip
-            key={tag.id}
-            testID={tag.testID}
-            label={t(tag.tr, tag.en)}
-            selected={priceTag === tag.id}
-            disabled={disabled}
-            onPress={() => onPriceTag(priceTag === tag.id ? null : tag.id)}
-          />
-        ))}
-      </ChipLine>
+      {badges && (
+        <ChipLine caption={t("Yazı", "Text")}>
+          {CAMPAIGN_PRESETS.map((item) => (
+            <Chip
+              key={item.id}
+              testID={item.testID}
+              label={presetText(item, lang)}
+              selected={preset === item.id}
+              disabled={disabled}
+              onPress={() =>
+                onBadge(preset === item.id ? "" : presetText(item, lang))
+              }
+            />
+          ))}
+          {seasons.map((set) => (
+            <Chip
+              key={set.id}
+              testID={set.testID}
+              label={set.label}
+              selected={seasonOn(set)}
+              disabled={disabled}
+              onPress={() => {
+                if (seasonOn(set)) return onBadge("");
+                onBadge(set.badge);
+                if (!headline.trim()) onHeadline(set.headline);
+              }}
+            />
+          ))}
+        </ChipLine>
+      )}
+      {priceTags && (
+        <ChipLine caption={t("Fiyat", "Price")}>
+          {PRICE_TAGS.map((tag) => (
+            <Chip
+              key={tag.id}
+              testID={tag.testID}
+              label={t(tag.tr, tag.en)}
+              selected={priceTag === tag.id}
+              disabled={disabled}
+              onPress={() => onPriceTag(priceTag === tag.id ? null : tag.id)}
+            />
+          ))}
+        </ChipLine>
+      )}
       {risk && touched && (
         <Text testID="campaign-risk-hint" style={s.footnote}>
           {t(

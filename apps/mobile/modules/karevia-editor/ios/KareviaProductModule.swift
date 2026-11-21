@@ -229,21 +229,35 @@ struct ProductMusicSpec: Record {
   @Field var volume: Double = 1
 }
 
-/// How a scene enters: "cut", "push", "wipe" or "zoom" over `duration` seconds.
+/// How a scene enters: "cut", "push", "wipe", "zoom" or "blur" over `duration`
+/// seconds, or "flash" (hard cut with one white frame; duration ignored).
 struct SceneTransitionSpec: Record {
   init() {}
   @Field var kind: String = "cut"
   @Field var duration: Double = 0
 }
 
+/// Colour grade of a multi-scene video, applied after the scenes and before
+/// the texts; each value -1...1, all 0 = no grade.
+struct ProductGradeSpec: Record {
+  init() {}
+  @Field var warmth: Double = 0
+  @Field var saturation: Double = 0
+  @Field var contrast: Double = 0
+  /// Positive lifts the blacks toward a warm grey; negative deepens them.
+  @Field var fade: Double = 0
+}
+
 /// One scene of a multi-scene video. `keys` and `shots` are relative to `start`.
 /// "cutout": drawn like the single-product spec with `image` as the product.
 /// "photo": `image` cover-fills the frame; the keys' scale is a zoom (1 = exact
-/// fill, values below 1 count as 1, at most 1.5) and x/y the photo point
-/// (fractions) put at the frame centre, as far as the photo still covers it.
+/// fill, values below 1 count as 1, at most 3), x/y the photo point
+/// (fractions) put at the frame centre, as far as the photo still covers it,
+/// and rotation a camera roll (degrees, clockwise, clamped to ±8).
 /// "depth": the photo split into depth layers (Depth Anything) for a 2.5D
-/// camera move; scale = dolly (1...1.4), x/y = camera offset (-1...1); rotation,
-/// yaw and opacity are ignored. Without depth it is drawn as a photo scene.
+/// camera move; scale = dolly (1...1.4), x/y = camera offset (-1...1),
+/// rotation = roll as in photo; yaw and opacity are ignored. Without depth it
+/// is drawn as a photo scene.
 struct ProductSceneSpec: Record {
   init() {}
   @Field var start: Double = 0
@@ -290,6 +304,8 @@ struct ProductVideoSpec: Record {
   @Field var look: ProductLookSpec? = nil
   /// Multi-scene video; empty = the single-product path.
   @Field var scenes: [ProductSceneSpec] = []
+  /// Multi-scene videos only: colour grade; nil or all 0 = none.
+  @Field var grade: ProductGradeSpec? = nil
 }
 
 // MARK: - One render at a time
@@ -528,6 +544,11 @@ public class KareviaProductModule: Module {
 
     Function("cancelRender") {
       self.renderState.cancel()
+    }
+
+    /// Physical RAM in bytes, for choosing the render quality on older phones.
+    Function("deviceMemory") { () -> Double in
+      return Double(ProcessInfo.processInfo.physicalMemory)
     }
 
     /// Short ad copy from Apple's on-device model (iOS 26, Apple Intelligence).
@@ -1675,6 +1696,16 @@ private struct PreparedScenes {
   let texts: [PreparedText]
   let watermark: PreparedText?
   let vignette: CGGradient?
+  /// Colour grade over the scenes (before texts); nil = none.
+  let grade: PreparedGrade?
+}
+
+/// A colour grade with every value clamped to -1...1 and at least one not 0.
+private struct PreparedGrade {
+  let warmth: Double
+  let saturation: Double
+  let contrast: Double
+  let fade: Double
 }
 
 /// What a render draws from: the single-product scene or a multi-scene video.
@@ -2779,27 +2810,67 @@ private enum ProductRenderer {
     }
   }
 
-  /// A photo scene: the photo cover-fills the frame, the keys pan and zoom it
-  /// (Ken Burns), then black at `shade` opacity keeps texts readable.
+  /// Largest camera roll of a photo or depth scene, in degrees.
+  static let sceneRollLimit: Double = 8
+
+  /// A photo/depth scene key's `rotation` (degrees, clockwise) as radians,
+  /// clamped to ±sceneRollLimit; 0 when not finite.
+  static func sceneRoll(degrees: Double) -> CGFloat {
+    guard degrees.isFinite else { return 0 }
+    let clamped = max(-sceneRollLimit, min(sceneRollLimit, degrees))
+    return CGFloat(clamped * Double.pi / 180)
+  }
+
+  /// The box, centred on the frame and axis-aligned in the rolled drawing,
+  /// that the photo must cover so no frame corner shows background once the
+  /// drawing turns by `roll` about the frame centre (2 px extra against edge
+  /// seams). Exactly `size` when there is no roll.
+  static func sceneCoverBox(roll: CGFloat, size: CGSize) -> CGSize {
+    guard roll != 0 else { return size }
+    let angle = Double(roll)
+    let c = CGFloat(abs(cos(angle))), s = CGFloat(abs(sin(angle)))
+    return CGSize(width: size.width * c + size.height * s + 2,
+                  height: size.width * s + size.height * c + 2)
+  }
+
+  /// Turns the drawing by `roll` about the frame centre (clockwise on screen
+  /// in the flipped, top-left-origin context, like the product's rotation).
+  static func applySceneRoll(_ ctx: CGContext, roll: CGFloat, size: CGSize) {
+    guard roll != 0 else { return }
+    ctx.translateBy(x: size.width / 2, y: size.height / 2)
+    ctx.rotate(by: roll)
+    ctx.translateBy(x: -size.width / 2, y: -size.height / 2)
+  }
+
+  /// A photo scene: the photo cover-fills the frame, the keys pan, zoom and
+  /// roll it (Ken Burns; rotation in degrees, clockwise, at most ±8), then
+  /// black at `shade` opacity keeps texts readable.
   static func drawPhotoScene(ctx: CGContext, t: Double, image: CGImage, keys: [ProductKeySpec], shade: Double, size: CGSize) {
     let W = size.width, H = size.height
     let pose = ProductRenderer.pose(at: t, keys: keys)
-    let zoom = CGFloat(pose.scale.isFinite ? max(1, min(1.5, pose.scale)) : 1)
+    let zoom = CGFloat(pose.scale.isFinite ? max(1, min(3, pose.scale)) : 1)
+    let roll = sceneRoll(degrees: pose.rotation)
+    // Rolled, the photo covers the frame's turned bounding box instead of the frame.
+    let cover = sceneCoverBox(roll: roll, size: size)
     let iw = CGFloat(max(1, image.width)), ih = CGFloat(max(1, image.height))
-    let fill = max(W / iw, H / ih) * zoom
+    let fill = max(cover.width / iw, cover.height / ih) * zoom
     let w = iw * fill, h = ih * fill
-    // The photo point (x, y) goes to the frame centre, kept where the photo still covers the frame.
+    // The photo point (x, y) goes to the frame centre, kept where the photo still covers the box.
     let fx = CGFloat(pose.x.isFinite ? max(0, min(1, pose.x)) : 0.5)
     let fy = CGFloat(pose.y.isFinite ? max(0, min(1, pose.y)) : 0.5)
-    let x0 = min(0, max(W - w, W / 2 - fx * w))
-    let y0 = min(0, max(H - h, H / 2 - fy * h))
+    let bx = (W - cover.width) / 2, by = (H - cover.height) / 2
+    let x0 = min(bx, max(bx + cover.width - w, W / 2 - fx * w))
+    let y0 = min(by, max(by + cover.height - h, H / 2 - fy * h))
     // Flip to top-left origin, as drawFrame does.
     ctx.saveGState()
     ctx.translateBy(x: 0, y: H)
     ctx.scaleBy(x: 1, y: -1)
     ctx.setFillColor(color("#000000"))
     ctx.fill(CGRect(origin: .zero, size: size))
+    ctx.saveGState()
+    applySceneRoll(ctx, roll: roll, size: size)
     draw(image, in: CGRect(x: x0, y: y0, width: w, height: h), ctx: ctx)
+    ctx.restoreGState()
     let strength = CGFloat(shade.isFinite ? max(0, min(1, shade)) : 0)
     if strength > 0.001 {
       ctx.setFillColor(color("#000000", alpha: strength))
@@ -2816,22 +2887,27 @@ private enum ProductRenderer {
 
   /// A depth scene: the photo as 4 depth layers drawn far to near, each moved
   /// by the camera. Keys: scale = dolly (1...1.4), x/y = camera offset
-  /// (-1...1, y down); near layers move and grow more than far ones. No keys =
-  /// camera at rest. Then black at `shade` opacity, as in a photo scene.
+  /// (-1...1, y down), rotation = camera roll (degrees, clockwise, at most
+  /// ±8); near layers move and grow more than far ones. No keys = camera at
+  /// rest. Then black at `shade` opacity, as in a photo scene.
   static func drawDepthScene(ctx: CGContext, t: Double, image: CGImage, masks: [CGImage], keys: [ProductKeySpec], shade: Double, size: CGSize) {
     let W = size.width, H = size.height
     var orbitX: CGFloat = 0
     var orbitY: CGFloat = 0
     var dolly: CGFloat = 1
+    var roll: CGFloat = 0
     if !keys.isEmpty {
       let pose = ProductRenderer.pose(at: t, keys: keys)
       orbitX = CGFloat(pose.x.isFinite ? max(-1, min(1, pose.x)) : 0)
       orbitY = CGFloat(pose.y.isFinite ? max(-1, min(1, pose.y)) : 0)
       dolly = CGFloat(pose.scale.isFinite ? max(1, min(1.4, pose.scale)) : 1)
+      roll = sceneRoll(degrees: pose.rotation)
     }
     let iw = CGFloat(max(1, image.width)), ih = CGFloat(max(1, image.height))
-    // Cover-fill plus 6 % overscan: the far layer still covers the frame when it shifts.
-    let fill = max(W / iw, H / ih) * 1.06
+    // Cover-fill (of the turned frame's box when rolled) plus 6 % overscan:
+    // the far layer still covers the frame when it shifts.
+    let cover = sceneCoverBox(roll: roll, size: size)
+    let fill = max(cover.width / iw, cover.height / ih) * 1.06
     let travel = W * 0.035
     let layerCount = masks.count + 1
     // Flip to top-left origin, as drawPhotoScene does.
@@ -2840,6 +2916,9 @@ private enum ProductRenderer {
     ctx.scaleBy(x: 1, y: -1)
     ctx.setFillColor(color("#000000"))
     ctx.fill(CGRect(origin: .zero, size: size))
+    // The whole camera rolls: every layer turns about the frame centre.
+    ctx.saveGState()
+    applySceneRoll(ctx, roll: roll, size: size)
     for layer in 0..<layerCount {
       // 0 = far ... 1 = near.
       let near = CGFloat(layer) / CGFloat(max(1, layerCount - 1))
@@ -2864,6 +2943,7 @@ private enum ProductRenderer {
         ctx.restoreGState()
       }
     }
+    ctx.restoreGState()  // camera roll
     let strength = CGFloat(shade.isFinite ? max(0, min(1, shade)) : 0)
     if strength > 0.001 {
       ctx.setFillColor(color("#000000", alpha: strength))
@@ -2930,9 +3010,71 @@ private enum ProductRenderer {
       out.x = 0.5 + 0.08 * x
       out.y = 0.5 + 0.08 * y
       out.scale = key.scale.isFinite ? max(1, min(1.4, key.scale)) : 1
+      // The roll carries over (drawPhotoScene clamps it like drawDepthScene).
+      out.rotation = key.rotation
       out.ease = key.ease
       return out
     }
+  }
+
+  /// The previous scene of a "blur" entrance: drawn off-screen at its own time,
+  /// then Gaussian-blurred by `radius` pixels (Core Image). Upright, frame size.
+  static func blurredScene(ctx: CGContext, index: Int, t: Double, radius: CGFloat, video: PreparedScenes) -> CGImage? {
+    guard let offscreen = makeContext(video.size) else { return nil }
+    offscreen.interpolationQuality = ctx.interpolationQuality
+    drawScene(ctx: offscreen, index: index, t: t, video: video)
+    guard let sharp = offscreen.makeImage() else { return nil }
+    guard radius > 0.3 else { return sharp }
+    let input = CIImage(cgImage: sharp)
+    let extent = input.extent
+    let blurred = input.clampedToExtent().applyingGaussianBlur(sigma: Double(radius)).cropped(to: extent)
+    return ciContext.createCGImage(blurred, from: extent) ?? sharp
+  }
+
+  /// Colour grade of the composed frame (Core Image, linear light): saturation
+  /// and contrast (CIColorControls), then warmth (red up, blue down) and fade
+  /// (mix toward a warm grey; negative stretches the blacks down) in one CIColorMatrix.
+  static func applyGrade(ctx: CGContext, size: CGSize, grade: PreparedGrade) {
+    guard let frameImage = ctx.makeImage() else { return }
+    var image = CIImage(cgImage: frameImage)
+    let extent = image.extent
+    if abs(grade.saturation) > 0.001 || abs(grade.contrast) > 0.001 {
+      let saturation: Double = 1 + grade.saturation
+      let contrast: Double = 1 + grade.contrast * 0.5
+      if let controlled = CIFilter(name: "CIColorControls", parameters: [
+           kCIInputImageKey: image,
+           "inputSaturation": saturation,
+           "inputContrast": contrast,
+         ])?.outputImage {
+        image = controlled
+      }
+    }
+    let warm: Double = grade.warmth * 0.1
+    let lift: Double = max(0, grade.fade) * 0.25
+    let crush: Double = max(0, -grade.fade) * 0.15
+    if abs(warm) > 0.0005 || lift > 0.0005 || crush > 0.0005 {
+      let keep: Double = (1 - lift) * (1 + crush)
+      let r = CGFloat((1 + warm) * keep)
+      let g = CGFloat((1 + warm * 0.25) * keep)
+      let b = CGFloat((1 - warm) * keep)
+      // Warm grey in linear light (about sRGB 0.33, 0.30, 0.26).
+      let biasR = CGFloat(lift * 0.09 - crush)
+      let biasG = CGFloat(lift * 0.072 - crush)
+      let biasB = CGFloat(lift * 0.055 - crush)
+      if let matrixed = CIFilter(name: "CIColorMatrix", parameters: [
+           kCIInputImageKey: image,
+           "inputRVector": CIVector(x: r, y: 0, z: 0, w: 0),
+           "inputGVector": CIVector(x: 0, y: g, z: 0, w: 0),
+           "inputBVector": CIVector(x: 0, y: 0, z: b, w: 0),
+           "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+           "inputBiasVector": CIVector(x: biasR, y: biasG, z: biasB, w: 0),
+         ])?.outputImage {
+        image = matrixed
+      }
+    }
+    guard let graded = ciContext.createCGImage(image.cropped(to: extent), from: extent) else { return }
+    // The frame is opaque, so the graded copy replaces it; drawn at the base (bottom-up) transform.
+    ctx.draw(graded, in: CGRect(origin: .zero, size: size))
   }
 
   /// Scene `index` at its own local time `t`, without the global texts.
@@ -2963,7 +3105,7 @@ private enum ProductRenderer {
     let local = max(0, t - current.start)
     let kind = current.transition.kind
     let span = current.transition.duration
-    let animated = kind == "push" || kind == "wipe" || kind == "zoom"
+    let animated = kind == "push" || kind == "wipe" || kind == "zoom" || kind == "blur"
     let entering = index > 0 && animated && span.isFinite && span > 0.0001 && local < span
     if entering {
       let previousLocal = max(0, t - video.scenes[index - 1].start)
@@ -2988,6 +3130,31 @@ private enum ProductRenderer {
         ctx.clip(to: CGRect(x: 0, y: 0, width: W * e, height: H))
         drawScene(ctx: ctx, index: index, t: local, video: video)
         ctx.restoreGState()
+      } else if kind == "blur" {
+        // blur: the new scene sharp underneath; the previous one grows 1 -> 1.12,
+        // blurs (radius 0 -> 24 px at 1080 wide) and fades out with 3 ghost copies.
+        drawScene(ctx: ctx, index: index, t: local, video: video)
+        let radius = 24 * e * W / 1080
+        if let previous = blurredScene(ctx: ctx, index: index - 1, t: previousLocal, radius: radius, video: video) {
+          let grow = 1 + 0.12 * e
+          let ghostSteps: [CGFloat] = [0, 0.07, 0.14, 0.22]
+          let ghostAlphas: [CGFloat] = [1, 0.5, 0.32, 0.2]
+          ctx.saveGState()
+          ctx.setAlpha(1 - e)
+          ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+          for g in 0..<ghostSteps.count {
+            let scale = grow * (1 + ghostSteps[g] * e)
+            let w = W * scale
+            let h = H * scale
+            ctx.saveGState()
+            ctx.setAlpha(ghostAlphas[g])
+            // The off-screen image is upright in this bottom-up context; centred, so no flip needed.
+            ctx.draw(previous, in: CGRect(x: (W - w) / 2, y: (H - h) / 2, width: w, height: h))
+            ctx.restoreGState()
+          }
+          ctx.endTransparencyLayer()
+          ctx.restoreGState()
+        }
       } else {
         // zoom: the previous scene grows 1 -> 1.15 and fades out over the new one.
         drawScene(ctx: ctx, index: index, t: local, video: video)
@@ -3004,6 +3171,14 @@ private enum ProductRenderer {
       }
     } else {
       drawScene(ctx: ctx, index: index, t: local, video: video)
+    }
+    if let grade = video.grade {
+      applyGrade(ctx: ctx, size: size, grade: grade)
+    }
+    // flash: white at 0.9 over the first 1/30 s of the scene (one frame at 30 fps, two at 60).
+    if kind == "flash" && index > 0 && local < 1.0 / 30 - 1e-6 {
+      ctx.setFillColor(color("#FFFFFF", alpha: 0.9))
+      ctx.fill(frame)
     }
 
     // Global layer, as at the end of drawFrame (top-left origin).
@@ -3180,7 +3355,7 @@ private enum ProductRenderer {
     try validate(spec)
     let scenes = spec.scenes
     let distinctImages = Set(scenes.map { $0.image }).count
-    guard scenes.count <= 8, distinctImages <= 8 else {
+    guard scenes.count <= 16, distinctImages <= 16 else {
       throw ProductFailure.invalid("The template has too many elements.")
     }
     var lastStart = -1.0
@@ -3194,6 +3369,16 @@ private enum ProductRenderer {
     }
     let missing = ProductFailure.coded("product-scene-image", "A photo used in the video could not be opened.")
     let longest = max(size.width, size.height)
+    // Zoomed photo/depth images decode larger (the highest key scale any scene uses
+    // with that image, 1...2, at most 4096 px) so close crops stay sharp.
+    var photoScale: [String: Double] = [:]
+    for scene in scenes where scene.mode == "photo" || scene.mode == "depth" {
+      var highest: Double = photoScale[scene.image] ?? 1
+      for key in scene.keys where key.scale.isFinite {
+        highest = max(highest, key.scale)
+      }
+      photoScale[scene.image] = highest
+    }
     var photoCache: [String: CGImage] = [:]
     var cutoutCache: [String: PreparedScene] = [:]
     var specs: [ProductVideoSpec?] = []
@@ -3212,7 +3397,12 @@ private enum ProductRenderer {
         if let hit = photoCache[scene.image] {
           photo = hit
         } else {
-          guard let decoded = ProductImages.upright(url, maxSide: longest) else { throw missing }
+          let factor = CGFloat(min(2, max(1, photoScale[scene.image] ?? 1)))
+          let side = min(4096, longest * factor)
+          let decodedImage: CGImage? = autoreleasepool { () -> CGImage? in
+            ProductImages.upright(url, maxSide: side)
+          }
+          guard let decoded = decodedImage else { throw missing }
           photoCache[scene.image] = decoded
           photo = decoded
         }
@@ -3316,7 +3506,17 @@ private enum ProductRenderer {
       photoKeys: photoKeysList,
       texts: spec.texts.compactMap { textImage($0, frame: size) },
       watermark: spec.watermark ? watermarkImage(frame: size) : nil,
-      vignette: vignette)
+      vignette: vignette,
+      grade: preparedGrade(spec.grade))
+  }
+
+  /// The grade with its values clamped to -1...1; nil when absent or all 0 (no per-frame work).
+  static func preparedGrade(_ spec: ProductGradeSpec?) -> PreparedGrade? {
+    guard let spec else { return nil }
+    let raw: [Double] = [spec.warmth, spec.saturation, spec.contrast, spec.fade]
+    let values: [Double] = raw.map { (v: Double) -> Double in v.isFinite ? max(-1, min(1, v)) : 0 }
+    guard values.contains(where: { (v: Double) -> Bool in abs(v) > 0.001 }) else { return nil }
+    return PreparedGrade(warmth: values[0], saturation: values[1], contrast: values[2], fade: values[3])
   }
 
   /// A half-resolution JPEG of the frame at `time` (540 px wide).

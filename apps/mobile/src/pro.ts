@@ -35,7 +35,14 @@ export const nativeStore =
 
 export type ProductsState = "loading" | "ready" | "failed";
 /** Why the paywall opened; it picks the heading and the first benefit. */
-export type PaywallReason = "video" | "image" | "marketplace" | "ai" | "desk";
+export type PaywallReason =
+  | "video"
+  | "image"
+  | "marketplace"
+  | "ai"
+  | "desk"
+  /** The editorial video's AI shots (shown in every build). */
+  | "shots";
 export type ProValue = {
   isPro: boolean;
   /** True until the first entitlement check has finished. */

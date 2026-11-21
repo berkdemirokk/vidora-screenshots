@@ -6,6 +6,8 @@ import {
   marketplaceImageById,
   marketplaceTextRisk,
   presetQuality,
+  deviceQuality,
+  LOW_MEMORY_BYTES,
 } from "./marketplace-images.ts";
 import {
   buildMainImageSpec,
@@ -67,4 +69,20 @@ test("the marketplace text hint shows only for the marketplace preset", () => {
   );
   assert.equal(presetQuality("trendyol"), "720p");
   assert.equal(presetQuality("reels"), "1080p");
+});
+
+test("phones under 3.5 GB of RAM start at 720p; old builds keep today's quality", () => {
+  const GB = 1024 ** 3;
+  assert.equal(LOW_MEMORY_BYTES, 3.5 * GB);
+  // A 3 GB iPhone reports a little under 3 GB.
+  assert.equal(deviceQuality("1080p", 2.8 * GB), "720p");
+  assert.equal(deviceQuality("1080p", 3.49 * GB), "720p");
+  assert.equal(deviceQuality("720p", 2.8 * GB), "720p");
+  // 4 GB and up (about 3.7 GB reported) keep the base.
+  assert.equal(deviceQuality("1080p", 3.7 * GB), "1080p");
+  assert.equal(deviceQuality("1080p", 6 * GB), "1080p");
+  assert.equal(deviceQuality("720p", 6 * GB), "720p");
+  // No native check: today's behaviour.
+  assert.equal(deviceQuality("1080p", null), "1080p");
+  assert.equal(deviceQuality("720p", null), "720p");
 });

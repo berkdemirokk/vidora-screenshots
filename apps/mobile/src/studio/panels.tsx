@@ -39,6 +39,7 @@ import {
   type IconName,
 } from "../ui";
 import { showActionSheet } from "../action-sheet";
+import type { RecipeText } from "../recipes/types";
 import { useTemplatePoster, type PosterCopy } from "../sample-frames";
 import {
   FONT_SAMPLE_FAMILY,
@@ -441,27 +442,12 @@ export function CategoryMenu({
   const current = CATEGORIES.find((item) => item.id === category);
   const currentName = current ? t(current.tr, current.en) : "";
   function openCategories() {
-    showActionSheet(
-      {
-        title: t("Ürün kategorisi", "Product category"),
-        message: t(
-          "Görünümler ve metin önerileri buna göre değişir.",
-          "The looks and text ideas follow it.",
-        ),
-        options: [
-          ...CATEGORIES.map((item) => t(item.tr, item.en)),
-          t("Vazgeç", "Cancel"),
-        ],
-        cancelButtonIndex: CATEGORIES.length,
-      },
-      (index) => {
-        const picked = CATEGORIES[index];
-        if (picked && picked.id !== category) {
-          tap("select");
-          onCategory(picked.id);
-        }
-      },
-    );
+    openCategorySheet(t, category, (picked) => {
+      if (picked && picked !== category) {
+        tap("select");
+        onCategory(picked);
+      }
+    });
   }
   return (
     <Pressable
@@ -485,6 +471,43 @@ export function CategoryMenu({
       </Text>
       <Icon name="chevron.down" size={13} color={Theme.text} />
     </Pressable>
+  );
+}
+
+/**
+ * The category menu's sheet. Plain (CategoryMenu): "Vazgeç" gives null.
+ * With `shots` (the editorial video, before its first AI shots): `current`
+ * (the last used category) is marked and "Devam et" keeps it.
+ */
+export function openCategorySheet(
+  t: (tr: string, en: string) => string,
+  current: CategoryId,
+  onPick: (id: CategoryId | null) => void,
+  shots = false,
+): void {
+  showActionSheet(
+    {
+      title: t("Ürün kategorisi", "Product category"),
+      message: shots
+        ? t(
+            "Çekimler bu kategoriye göre hazırlanır.",
+            "The shots are set up for this category.",
+          )
+        : t(
+            "Görünümler ve metin önerileri buna göre değişir.",
+            "The looks and text ideas follow it.",
+          ),
+      options: [
+        ...CATEGORIES.map(
+          (item) =>
+            t(item.tr, item.en) + (shots && item.id === current ? " ✓" : ""),
+        ),
+        shots ? t("Devam et", "Continue") : t("Vazgeç", "Cancel"),
+      ],
+      cancelButtonIndex: CATEGORIES.length,
+    },
+    (index) =>
+      onPick(CATEGORIES[index]?.id ?? (shots ? current : null)),
   );
 }
 
@@ -1074,9 +1097,12 @@ export function TextPanel({
   stacked = false,
   onFocusChange,
   extras,
+  shown = null,
 }: {
   /** Campaign chips shown above the fields in the single flow. */
   extras?: ReactNode;
+  /** Single flow: only these fields (usedTextFields); null shows all. */
+  shown?: readonly RecipeText["field"][] | null;
   /** Single flow: Ürün adı, Fiyat, Etiket and Buton yazısı at once, no tabs. */
   allFields?: boolean;
   /** Keyboard open: the four fields stack at full width. */
@@ -1225,6 +1251,7 @@ export function TextPanel({
         disabled={disabled}
         onFocusChange={onFocusChange}
         extras={extras}
+        shown={shown}
       />
     );
   }
@@ -1449,10 +1476,13 @@ function TextFields({
   disabled,
   onFocusChange,
   extras,
+  shown,
 }: {
   onFocusChange?: (name: string | null) => void;
   /** Campaign chips at the top of the grid (hidden while the keyboard stacks the fields). */
   extras?: ReactNode;
+  /** Only these fields; null shows all five. */
+  shown: readonly RecipeText["field"][] | null;
   fields: FieldSpec[];
   price: string;
   onPrice: (value: string) => void;
@@ -1492,14 +1522,19 @@ function TextFields({
     testID: "field-old-price",
     tab: t("Eski fiyat", "Old price"),
   };
-  const order = [
-    name.testID,
-    priceField.testID,
-    oldPriceField.testID,
-    badge.testID,
-    cta.testID,
-  ];
-  const fieldList = [name, priceField, oldPriceField, badge, cta];
+  const on = (id: RecipeText["field"]) => !shown || shown.includes(id);
+  const fieldList = (
+    [
+      ["name", name],
+      ["price", priceField],
+      ["oldPrice", oldPriceField],
+      ["badge", badge],
+      ["cta", cta],
+    ] as const
+  )
+    .filter(([id]) => on(id))
+    .map(([, f]) => f);
+  const order = fieldList.map((f) => f.testID);
   const focusedName = fieldList.find((f) => f.testID === focused)?.tab;
   useEffect(() => {
     onFocusChange?.(focusedName ?? null);
@@ -1627,11 +1662,11 @@ function TextFields({
       }}
     >
       {!stacked && !!extras && <View style={{ width: "100%" }}>{extras}</View>}
-      {cell(name, false, false)}
-      {cell(priceField, true, splitPrice)}
-      {cell(oldPriceField, true, splitPrice)}
-      {cell(badge)}
-      {cell(cta)}
+      {on("name") && cell(name, false, false)}
+      {on("price") && cell(priceField, true, splitPrice && on("oldPrice"))}
+      {on("oldPrice") && cell(oldPriceField, true, splitPrice && on("price"))}
+      {on("badge") && cell(badge, false, !stacked && on("cta"))}
+      {on("cta") && cell(cta, false, !stacked && on("badge"))}
       {!!note && (
         <Text
           testID="dropped-note"

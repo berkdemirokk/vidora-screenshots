@@ -2,7 +2,10 @@ import {
   LIMITS,
   MAX_SCENES,
   buildSpec,
+  layoutForRatio,
   paletteById,
+  ratioHeight,
+  type AspectRatio,
   type FontStyle,
   type Palette,
   type ProductBackground,
@@ -69,6 +72,111 @@ function tones(p: Palette) {
 
 /** Edge of the "split" tone: paper left of 22 % of the width, accent right of it; left of a centred price ("349 TL" at 0.18 spans ~0.26-0.74). */
 export const SPLIT_EDGE = 0.22;
+
+// MARK: Frame shapes
+
+/**
+ * Safe area of the 4:5 and 1:1 feed posts (frame fractions): no Reels
+ * buttons or caption, so texts may use y 0.08-0.92 (whole box) and keep
+ * 0.06 from the sides (plain lines are at most 86 % of the width, pills
+ * stay inside that band too, see textMaxWidth).
+ */
+export const FEED_BAND = { top: 0.08, bottom: 0.92, side: 0.06 } as const;
+/**
+ * Box extent of the 9:16 recipe texts (end-card name top ~0.11, action
+ * bottom ~0.82); the top is taken a little higher so the 1:1 end-card name
+ * keeps its size above the price pill.
+ */
+const DESIGN_TOP = 0.105,
+  DESIGN_BOTTOM = 0.82;
+/** Photo zoom per shape: wider frames show more of a photo, so detail shots push in. */
+const PHOTO_ZOOM: Record<AspectRatio, number> = { "9:16": 1, "4:5": 1.1, "1:1": 1.2 };
+/** Depth dolly per shape: part of the way left to the 1.4 limit. */
+const DEPTH_PUSH: Record<AspectRatio, number> = { "9:16": 0, "4:5": 0.15, "1:1": 0.25 };
+const MAX_ZOOM = 3,
+  MAX_DOLLY = 1.4;
+/**
+ * Cut-out product growth per shape: square frames show the product about
+ * 15 % larger where it still keeps PRODUCT_CLEARANCE from the texts and
+ * stays in frame (growProducts).
+ */
+const PRODUCT_GROW: Record<AspectRatio, number> = { "9:16": 1, "4:5": 1, "1:1": 1.15 };
+
+/**
+ * How the 9:16 recipe layouts map onto a frame shape:
+ * - `top`/`bottom`: text band; 9:16 bounds the centre (y 0.14-0.80, clear
+ *   of the Reels caption and buttons), the feed shapes the whole box
+ *   (FEED_BAND) when `box` is true;
+ * - `tall`: a width-based length (text size) in frame heights, relative to
+ *   9:16 (16/9 divided by the shape's height/width);
+ * - `text`: text size factor (the classic templates' factor: 0.82 for 4:5,
+ *   0.68 for 1:1), so type reads like the other videos of that shape;
+ * - `y`: a 9:16 centre (text or product) in the new frame: the 9:16 design
+ *   extent 0.105-0.82 stretched over 0.08-0.92;
+ * - `zoom` / `push`: photo zoom factor and depth dolly push (see PHOTO_ZOOM,
+ *   DEPTH_PUSH);
+ * - `grow`: cut-out product growth where there is room (PRODUCT_GROW).
+ * Cut-out products keep their scale (height as a fraction of the frame
+ * height) and are kept fully inside the frame.
+ */
+export function ratioLayout(ratio: AspectRatio = "9:16") {
+  if (ratio === "9:16")
+    return {
+      ratio,
+      top: TEXT_TOP,
+      bottom: TEXT_BOTTOM,
+      box: false,
+      tall: 1,
+      text: 1,
+      zoom: 1,
+      push: 0,
+      grow: 1,
+      y: (y: number) => y,
+    };
+  const stretch = (FEED_BAND.bottom - FEED_BAND.top) / (DESIGN_BOTTOM - DESIGN_TOP);
+  return {
+    ratio,
+    top: FEED_BAND.top,
+    bottom: FEED_BAND.bottom,
+    box: true,
+    tall: 16 / 9 / ratioHeight(ratio),
+    text: layoutForRatio(ratio).text,
+    zoom: PHOTO_ZOOM[ratio],
+    push: DEPTH_PUSH[ratio],
+    grow: PRODUCT_GROW[ratio],
+    y: (y: number) => r4(FEED_BAND.top + (y - DESIGN_TOP) * stretch),
+  };
+}
+
+export type RatioLayout = ReturnType<typeof ratioLayout>;
+
+const r4 = (n: number) => Math.round(n * 10000) / 10000;
+
+/**
+ * Scene keys of a 9:16 recipe in another frame shape (9:16: unchanged).
+ * Cut-out: the product keeps its scale and its centre moves with `y`, kept
+ * fully inside the frame; photo: same photo point, zoom times `zoom` (the
+ * renderer's zoom is 1...3); depth: same camera offset, dolly pushed toward
+ * 1.4 by `push` (order and motion kept).
+ */
+export function keysForRatio(
+  keys: ProductKey[],
+  mode: ProductScene["mode"],
+  layout: RatioLayout,
+): ProductKey[] {
+  if (layout.ratio === "9:16") return keys;
+  return keys.map((k) => {
+    if (mode === "cutout") {
+      const half = Math.min(0.5, k.scale / 2);
+      return { ...k, y: r4(Math.max(half, Math.min(1 - half, layout.y(k.y)))) };
+    }
+    if (mode === "photo")
+      return { ...k, scale: r4(Math.min(MAX_ZOOM, Math.max(1, k.scale) * layout.zoom)) };
+    return k.scale <= MAX_DOLLY
+      ? { ...k, scale: r4(k.scale + (MAX_DOLLY - k.scale) * layout.push) }
+      : k;
+  });
+}
 
 /** The cut-out background for a scene tone in a palette. */
 export function toneBackground(p: Palette, tone: SceneTone): ProductBackground {
@@ -194,10 +302,12 @@ export function estimateLines(
 /**
  * Half the text block's height as a fraction of a 9:16 frame's height: a
  * line is about size * 0.6 (size is a fraction of the width); pills add
- * 0.35 em above and below, plain texts a little room for accents.
+ * 0.35 em above and below, plain texts a little room for accents. `tall`
+ * (RatioLayout.tall) converts to another frame shape's height.
  */
-export function textHalfHeight(lines: number, size: number, pill: boolean): number {
-  return (size * 0.6 * (lines + (pill ? 0.7 : 0.3))) / 2;
+export function textHalfHeight(lines: number, size: number, pill: boolean, tall = 1): number {
+  const half = (size * 0.6 * (lines + (pill ? 0.7 : 0.3))) / 2;
+  return tall === 1 ? half : half * tall;
 }
 
 /** Shrinks a text to at most two lines down to this size (or its own, if smaller). */
@@ -215,8 +325,8 @@ type Band = { top: number; bottom: number; gap: number };
 const linesOf = (t: ProductText, size: number) =>
   estimateLines(t.text, size, t.font ?? "system", t.tracking ?? 0, t.fill !== "");
 
-function textBand(t: ProductText, gap: number): Band {
-  const half = textHalfHeight(linesOf(t, t.size), t.size, t.fill !== "");
+function textBand(t: ProductText, gap: number, tall: number): Band {
+  const half = textHalfHeight(linesOf(t, t.size), t.size, t.fill !== "", tall);
   return { top: t.y - half, bottom: t.y + half, gap };
 }
 
@@ -232,13 +342,27 @@ function productBands(t: ProductText, scenes: ProductScene[], duration: number):
   return out;
 }
 
-/** The y nearest to `y0` (within the text band) where a block of `half` clears every band, or null. */
-function placeY(y0: number, half: number, bands: Band[]): number | null {
+/**
+ * The y nearest to `y0` (within the text band) where a block of `half`
+ * clears every band, or null. 9:16 bounds the centre; feed shapes
+ * (`layout.box`) keep the whole block inside the band.
+ */
+function placeY(y0: number, half: number, bands: Band[], layout: RatioLayout): number | null {
   const clear = (y: number) =>
     bands.every((b) => y + half <= b.top - b.gap + 1e-9 || y - half >= b.bottom + b.gap - 1e-9);
-  const clamp = (y: number) => Math.max(TEXT_TOP, Math.min(TEXT_BOTTOM, y));
+  const lo = layout.box ? layout.top + half : layout.top,
+    hi = layout.box ? layout.bottom - half : layout.bottom;
+  if (lo > hi) return null;
+  const clamp = (y: number) => Math.max(lo, Math.min(hi, y));
+  // Feed shapes try both 4-decimal neighbours (rounding must not cost a
+  // clear spot) and keep the box inside the band.
+  const round = (y: number) =>
+    layout.box
+      ? [Math.floor(y * 10000) / 10000, Math.ceil(y * 10000) / 10000]
+      : [Math.round(y * 10000) / 10000];
   const tries = [y0, ...bands.flatMap((b) => [b.top - b.gap - half, b.bottom + b.gap + half])]
-    .map((y) => Math.round(clamp(y) * 10000) / 10000)
+    .flatMap((y) => round(clamp(y)))
+    .filter((y) => y >= lo - 1e-9 && y <= hi + 1e-9)
     .filter(clear)
     .sort((a, b) => Math.abs(a - y0) - Math.abs(b - y0));
   return tries.length ? tries[0] : null;
@@ -246,44 +370,115 @@ function placeY(y0: number, half: number, bands: Band[]): number | null {
 
 /**
  * Fits seller texts of any length: each text shrinks until it takes at most
- * two lines (not below FIT_FLOOR); then, if it would come closer than
- * PRODUCT_CLEARANCE to the product in a cut-out scene, or overlap another
- * text, it moves (within y 0.14-0.80) or shrinks further. Names go last so
- * they make room around the fixed price and action texts. Changes `texts`.
+ * two lines (FIT_FLOOR first, then down to the hard floor if a wide font
+ * still needs it); a text on a split scene shrinks to stay right of the
+ * edge; then, if it would come closer than PRODUCT_CLEARANCE to the product
+ * in a cut-out scene, or overlap another text, it moves (within the text
+ * band) or shrinks further. Names go last so they make room around the fixed
+ * price and action texts. Changes `texts`; returns the texts that found no
+ * clear spot even at the hard floor (left out of the video).
  */
 function fitTexts(
   texts: ProductText[],
   fields: RecipeText["field"][],
   scenes: ProductScene[],
   duration: number,
-): void {
+  layout: RatioLayout,
+  splitTexts: Set<ProductText>,
+): Set<ProductText> {
+  const unplaced = new Set<ProductText>();
   const overlaps = (a: ProductText, b: ProductText) => a.start < b.end && b.start < a.end;
+  // Floors scale with the shape's text factor (9:16: x 1, unchanged).
+  const fitFloor = FIT_FLOOR * layout.text,
+    hardFloor = HARD_FLOOR * layout.text;
+  const step = (size: number, floor: number) => Math.max(floor, Math.round((size - 0.0025) * 10000) / 10000);
   const fit = (t: ProductText, others: ProductText[]) => {
     const pill = t.fill !== "";
-    const floor = Math.min(t.size, FIT_FLOOR);
+    const floor = Math.min(t.size, fitFloor);
     let size = t.size;
-    while (size > floor && linesOf(t, size) > 2) size = Math.max(floor, Math.round((size - 0.0025) * 10000) / 10000);
+    while (size > floor && linesOf(t, size) > 2) size = step(size, floor);
+    // Every text stays within two lines (wide fonts may need to go below
+    // the fit floor).
+    while (size > hardFloor && linesOf(t, size) > 2) size = step(size, hardFloor);
+    // A text on a split scene stays on the accent side, right of the edge
+    // (centred, so at most 2 * (0.5 - edge) wide on one line).
+    if (splitTexts.has(t))
+      while (size > hardFloor && textWidth(t.text, size, t.font ?? "system", t.tracking ?? 0) > 2 * (0.5 - SPLIT_EDGE))
+        size = step(size, hardFloor);
     const bands = [
       ...productBands(t, scenes, duration),
-      ...others.filter((o) => o !== t && overlaps(o, t)).map((o) => textBand(o, TEXT_GAP)),
+      ...others.filter((o) => o !== t && overlaps(o, t)).map((o) => textBand(o, TEXT_GAP, layout.tall)),
     ];
     for (;;) {
-      const y = placeY(t.y, textHalfHeight(linesOf(t, size), size, pill), bands);
+      const y = placeY(t.y, textHalfHeight(linesOf(t, size), size, pill, layout.tall), bands, layout);
       if (y !== null) {
         t.y = y;
         t.size = size;
         return;
       }
-      if (size <= HARD_FLOOR) {
+      if (size <= hardFloor) {
         t.size = size;
+        unplaced.add(t);
         return;
       }
-      size = Math.max(HARD_FLOOR, Math.round((size - 0.0025) * 10000) / 10000);
+      size = step(size, hardFloor);
     }
   };
-  // Fixed texts first (only the product counts), then names around them.
-  for (const t of texts.filter((_, i) => fields[i] !== "name")) fit(t, []);
+  // Fixed texts first (only the product counts; feed shapes, whose taller
+  // type is rescaled, also keep clear of the fixed texts placed before),
+  // then names around them.
+  const placed: ProductText[] = [];
+  for (const t of texts.filter((_, i) => fields[i] !== "name")) {
+    fit(t, layout.box ? placed : []);
+    placed.push(t);
+  }
   for (const t of texts.filter((_, i) => fields[i] === "name")) fit(t, texts);
+  return unplaced;
+}
+
+/**
+ * Square frames: each cut-out scene's product grows by up to `layout.grow`
+ * (largest factor in 0.01 steps) while every key stays in frame and keeps
+ * PRODUCT_CLEARANCE from the texts on screen with it. Texts do not move.
+ */
+function growProducts(
+  scenes: ProductScene[],
+  texts: ProductText[],
+  duration: number,
+  layout: RatioLayout,
+): void {
+  if (layout.grow <= 1) return;
+  scenes.forEach((s, i) => {
+    if (s.mode !== "cutout") return;
+    const end = i + 1 < scenes.length ? scenes[i + 1].start : duration;
+    const bands = texts
+      .filter((t) => t.start < end && t.end > s.start)
+      .map((t) => textBand(t, PRODUCT_CLEARANCE, layout.tall));
+    const grown = (f: number) =>
+      s.keys.map((k) => {
+        const scale = r4(k.scale * f),
+          half = Math.min(0.5, scale / 2);
+        // Rounded inward so the box stays in frame.
+        const lo = Math.ceil(half * 10000) / 10000,
+          hi = Math.floor((1 - half) * 10000) / 10000;
+        return { ...k, scale, y: Math.max(lo, Math.min(hi, r4(k.y))) };
+      });
+    const fits = (keys: ProductKey[]) =>
+      keys.every(
+        (k) =>
+          k.scale <= 1 &&
+          bands.every(
+            (b) => b.bottom + b.gap <= k.y - k.scale / 2 + 1e-9 || b.top - b.gap >= k.y + k.scale / 2 - 1e-9,
+          ),
+      );
+    for (let f = layout.grow; f > 1.0001; f = r4(f - 0.01)) {
+      const keys = grown(f);
+      if (fits(keys)) {
+        s.keys = keys;
+        return;
+      }
+    }
+  });
 }
 
 /** The native side allows 30 s; recipes stay short. */
@@ -330,6 +525,7 @@ export function buildRecipeSpec(
     .map((rs, i) => ({ rs, start: starts[i] }))
     .filter(({ start }) => start < duration - 0.2);
   const palette = paletteById(input.palette);
+  const layout = ratioLayout(input.ratio);
   /** Tone per built scene; only cut-out scenes keep one. */
   const sceneTones: (SceneTone | undefined)[] = [];
   const scenes: ProductScene[] = kept.map(({ rs, start }, i) => {
@@ -351,7 +547,11 @@ export function buildRecipeSpec(
       start,
       image: mode === "cutout" ? (cutout as string) : photo,
       mode,
-      keys: rs.keys.map((k) => ({ ...k, t: Math.min(k.t, length) })),
+      keys: keysForRatio(
+        rs.keys.map((k) => ({ ...k, t: Math.min(k.t, length) })),
+        mode,
+        layout,
+      ),
       transition:
         i === 0
           ? { kind: "cut", duration: 0 }
@@ -386,7 +586,7 @@ export function buildRecipeSpec(
     quality: input.quality,
     watermark: false,
     music: null,
-    ratio: input.ratio,
+    ratio: layout.ratio,
   });
   const rest = base.keys[base.keys.length - 1];
   const hold = (t: number): ProductKey => ({ ...rest, t, ease: "linear" });
@@ -400,6 +600,8 @@ export function buildRecipeSpec(
   };
   const texts: ProductText[] = [];
   const fields: RecipeText["field"][] = [];
+  /** Texts that start on a split scene (kept right of its edge). */
+  const splitTexts = new Set<ProductText>();
   for (const rt of recipe.texts) {
     const text = value[rt.field].trim().slice(0, LIMITS.maxTextLength);
     const start = Math.max(0, rt.start);
@@ -418,19 +620,29 @@ export function buildRecipeSpec(
       const [a, b] = [luminance(palette.accent), luminance(bg)];
       if ((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= 3) colours.color = palette.accent;
     }
-    texts.push({
+    const built: ProductText = {
       text,
       start,
       end,
-      y: rt.y,
-      size: rt.size,
+      // 9:16 keeps the designed numbers; other shapes re-band and rescale.
+      y: layout.box ? layout.y(rt.y) : rt.y,
+      size: layout.box ? r4(rt.size * layout.text) : rt.size,
       ...rt.style,
       ...colours,
-    });
+    };
+    texts.push(built);
     fields.push(rt.field);
+    if (tone === "split") splitTexts.add(built);
   }
 
-  fitTexts(texts, fields, scenes, duration);
+  const unplaced = fitTexts(texts, fields, scenes, duration, layout, splitTexts);
+  // Texts with no clear spot, then any over the limit, are left out; the
+  // editor says so (spec.dropped).
+  const shown = texts.filter((t) => !unplaced.has(t)).slice(0, LIMITS.maxTexts);
+  const dropped = [
+    ...new Set(fields.filter((_, i) => !shown.includes(texts[i]))),
+  ];
+  growProducts(scenes, shown, duration, layout);
 
   return {
     product: scenes[0].image,
@@ -445,13 +657,14 @@ export function buildRecipeSpec(
     reflection: false,
     sweeps: [],
     sparkles: null,
-    texts: texts.slice(0, LIMITS.maxTexts),
+    texts: shown,
     watermark: input.watermark === true,
     music: input.music ?? null,
     relief: 0,
-    ratio: input.ratio,
+    ratio: layout.ratio,
     shots: [],
     scenes,
     look: base.look,
+    ...(dropped.length > 0 ? { dropped } : {}),
   };
 }

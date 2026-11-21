@@ -41,6 +41,23 @@ export const SCENE_STYLES: readonly {
   { id: "model-street", tr: "Manken · sokak", en: "Model · street" },
 ];
 
+/**
+ * The editorial video's 3 AI shots, in its order [context, hand, macro]
+ * (cloud/worker/src/styles.ts SHOT_STYLES). Always 9:16 (768x1344).
+ */
+export const SHOT_STYLES = ["shot-context", "shot-hand", "shot-macro"] as const;
+export type ShotStyleId = (typeof SHOT_STYLES)[number];
+
+/** Form fields of one shot request; `category` (app category id) picks the context setting. */
+export function shotFields(
+  style: ShotStyleId,
+  category: CategoryId | null,
+): Record<string, string> {
+  return category
+    ? { style, ratio: "9:16", category }
+    : { style, ratio: "9:16" };
+}
+
 /** Best styles first, per product category; the rest follow in list order. */
 export const STYLE_ORDER: Readonly<Record<CategoryId, readonly SceneStyleId[]>> =
   {

@@ -33,20 +33,41 @@ import {
 import { showActionSheet } from "../src/action-sheet";
 import {
   QA_DIAG,
+  QA_EDITORIAL,
   QA_QUALITY,
   QA_RECIPE,
   QA_SLOW_RENDER,
   SINGLE_FLOW,
   SINGLE_FLOW_TEMPLATES,
 } from "../src/config";
-import { cloudAvailable, takeChosenScene } from "../src/cloud";
+import {
+  CloudError,
+  cloudAvailable,
+  generateShots,
+  knownQuota,
+  takeChosenScene,
+} from "../src/cloud";
+import { grantAiConsent, hasAiConsent } from "../src/ai-consent";
+import { buildEditorialSpec } from "../src/recipes/editorial";
+import {
+  EDITORIAL_NAME,
+  NO_SHOTS,
+  editorialStart,
+  fewShotsNote,
+  mergeShots,
+  shotsNote,
+  shotsToRequest,
+} from "../src/editorial-flow";
+import { editorialSample } from "../src/editorial-sample";
+import { EditorialPanel } from "../src/studio/editorial-panel";
+import { ConsentSheet } from "../src/studio/consent-sheet";
 import { productPlacement } from "../src/cloud-rules";
 import type { SceneInput } from "../src/product-templates";
 import { Asset } from "expo-asset";
 import { Paths } from "expo-file-system";
 import sampleProduct from "../assets/sample-product.jpg";
 import { buildRecipeSpec } from "../src/recipes/build";
-import { variantById } from "../src/recipes";
+import { usedTextFields, variantById } from "../src/recipes";
 import {
   canStartVariant,
   parsePhotosParam,
@@ -158,7 +179,12 @@ import {
   monotonicNow,
   stallBudgetMs,
 } from "../src/render-watchdog";
-import { loadLastLook, saveLastLook } from "../src/last-look";
+import {
+  loadLastCategory,
+  loadLastLook,
+  saveLastCategory,
+  saveLastLook,
+} from "../src/last-look";
 import {
   SAMPLE_COPY,
   forgetUserPosters,
@@ -197,9 +223,11 @@ import {
   type StillStyleId,
   marketplaceTextRisk,
   presetQuality,
+  deviceQuality,
   type MarketplaceImageId,
 } from "../src/marketplace-images";
 import {
+  deviceMemoryBytes,
   aiCopySuggestions,
   cancelProductRender,
   cutOut,
@@ -268,6 +296,7 @@ import {
 import {
   BackgroundPanel,
   CategoryMenu,
+  openCategorySheet,
   FormatPanel,
   MusicPanel,
   TemplateChoicePanel,
@@ -450,6 +479,8 @@ export default function CreateProductVideo() {
       variant?: string;
       /** Photos picked on Home for that variant (JSON list of file URIs). */
       photos?: string;
+      /** Home's Editoryal card: the editorial video (new video only). */
+      editorial?: string;
     }>(),
     router = useRouter(),
     t = useT(),
@@ -460,6 +491,18 @@ export default function CreateProductVideo() {
     isFocused = useIsFocused(),
     reduceMotion = useReduceMotion();
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  // The editorial video (recipes/editorial.ts): from Home's Editoryal card
+  // (or the QA build's sample flow) for a new video, from the draft on restore.
+  const [startMode] = useState(() => editorialStart(params, QA_EDITORIAL));
+  const [editorial, setEditorial] = useState(startMode.editorial);
+  // Its AI shots [context, hand, macro] (cache files or the bundled sample);
+  // null = not made, the seller's photos stand in.
+  const [aiShots, setAiShots] = useState<(string | null)[]>([...NO_SHOTS]);
+  const aiShotsNow = useRef(aiShots);
+  aiShotsNow.current = aiShots;
+  // The AI consent sheet for the shots, and who waits for its answer.
+  const [consentOpen, setConsentOpen] = useState(false);
+  const consentAnswer = useRef<((ok: boolean) => void) | null>(null);
   // The gallery variant in use (recipe mode); null for the classic templates.
   // A new video takes it from Home's card; a draft from its own field.
   // A recipe never starts with fewer photos than it needs (Önce/Sonra: 2;
@@ -605,6 +648,8 @@ export default function CreateProductVideo() {
   /** A failed autosave is told once until a save works again. */
   const saveFailTold = useRef(false);
   const qualityChosen = useRef(false);
+  // The phone's RAM, read once (null on builds without the native check).
+  const [memoryBytes] = useState(deviceMemoryBytes);
   /** The user changed the backdrop or button text; a late last look yields. */
   const lookTouched = useRef(false);
   /** One action at a time: a second tap is ignored (audit F43). */
@@ -634,6 +679,8 @@ export default function CreateProductVideo() {
       })),
     );
     setMusicChoice(state.musicPattern ?? null);
+    setEditorial(state.editorial === true);
+    setAiShots([0, 1, 2].map((i) => state.aiShots?.[i] ?? null));
     // A variant this build does not know opens with the classic templates.
     setVariantId(
       state.variant && variantById(state.variant) ? state.variant : null,
@@ -885,15 +932,17 @@ export default function CreateProductVideo() {
   // out during render, so a render started right after a purchase already
   // uses it (audit F14). People without Pro preview at 720p. QA builds can
   // force one quality (EXPO_PUBLIC_QA_QUALITY); null everywhere else.
+  // Phones under 3.5 GB of RAM start at 720p (deviceQuality); a quality
+  // the user picked stays.
   const effectiveQuality: ProductQuality =
     QA_QUALITY ??
     (!isPro
       ? "720p"
       : SINGLE_FLOW
-        ? "1080p"
+        ? deviceQuality("1080p", memoryBytes)
         : qualityChosen.current
           ? quality
-          : presetQuality(preset));
+          : deviceQuality(presetQuality(preset), memoryBytes));
 
   // Photo hints: quiet, never blocking. "blurry" stays hidden until its
   // threshold is calibrated; the measured values are logged for that.
@@ -1070,8 +1119,12 @@ export default function CreateProductVideo() {
     [variantId, classicChosen],
   );
   const isRecipe = !!recipeUsed && !!cutout;
-  /** Recipes are 9:16 only: the preview box, drafts and Düzenle use this. */
-  const shownRatio: AspectRatio = isRecipe ? "9:16" : ratio;
+  /**
+   * The shape the preview box, drafts and Düzenle use. Recipes and the
+   * editorial video open at 9:16 with the shape locked; a 4:5 or 1:1 video
+   * from Hepsini çıkar reopens (Düzenle) in its own shape.
+   */
+  const shownRatio: AspectRatio = ratio;
   /** Photos the template takes (a recipe's own range, else 1 to 8). */
   const photoLimits = photoRange(isRecipe ? recipeUsed?.recipe : null);
   /** The AI picture in use when it already shows the product (else null). */
@@ -1079,7 +1132,7 @@ export default function CreateProductVideo() {
     ownActive: ownActive && !!ownBackdrop,
     backdrop,
   });
-  const beatPattern = resolveMusicPattern(musicChoice, isRecipe);
+  const beatPattern = resolveMusicPattern(musicChoice, isRecipe || editorial);
 
   // Old templates draw photo 1 only: the added photos change nothing there.
   const recipePhotos = isRecipe ? photos : null;
@@ -1091,26 +1144,9 @@ export default function CreateProductVideo() {
    */
   const spec = useMemo(() => {
     if (!specInput) return null;
-    if (recipePhotos && recipeUsed) {
-      const built = buildRecipeSpec(recipeUsed.recipe, {
-        // An AI picture with the product is the opening scene only (full
-        // frame, no cut-out); every other scene uses the seller's photos.
-        ...recipeSources(recipePhotos, aiScene?.uri ?? null),
-        name: headline,
-        price,
-        oldPrice,
-        badge,
-        cta,
-        // A variant brings its palette; the QA recipe uses the editor's.
-        palette: recipeUsed.palette ?? palette,
-        // Recipe texts and products are placed for 9:16.
-        ratio: "9:16",
-        quality: effectiveQuality,
-        music: specInput.music,
-        watermark: !isPro,
-      }) as ProductVideoSpec & { ratio: AspectRatio };
-      return built;
-    }
+    // The editorial video or a recipe, in the editor's shape.
+    const made = modeSpec(shownRatio, effectiveQuality, !isPro);
+    if (made) return made;
     // Never the cut-out over an AI picture that already shows the product.
     const built = guardAiScene(
       buildSpec({
@@ -1123,6 +1159,9 @@ export default function CreateProductVideo() {
     return built;
   }, [
     specInput,
+    editorial,
+    aiShots,
+    photos,
     recipePhotos,
     recipeUsed,
     aiScene,
@@ -1136,6 +1175,52 @@ export default function CreateProductVideo() {
     effectiveQuality,
     isPro,
   ]);
+  /**
+   * The editorial video or the recipe in `shape` (the editor's shape, or
+   * each shape of Hepsini çıkar and the stills); null for the classic
+   * templates. A function declaration, so the memo above can call it.
+   */
+  function modeSpec(
+    shape: AspectRatio,
+    quality: ProductQuality,
+    watermark: boolean,
+  ): (ProductVideoSpec & { ratio: AspectRatio }) | null {
+    const music = specInput?.music ?? null;
+    if (editorial) {
+      // The AI shots where made, the seller's photos for the rest.
+      return buildEditorialSpec({
+        ai: aiShots,
+        photos: photos.map((p) => p.source),
+        cutouts: photos.map((p) => p.cutout?.uri ?? null),
+        name: headline,
+        price,
+        palette,
+        music,
+        watermark,
+        quality,
+        ratio: shape,
+      }) as ProductVideoSpec & { ratio: AspectRatio };
+    }
+    if (recipePhotos && recipeUsed)
+      return buildRecipeSpec(recipeUsed.recipe, {
+        // An AI picture with the product is the opening scene only (full
+        // frame, no cut-out); every other scene uses the seller's photos.
+        ...recipeSources(recipePhotos, aiScene?.uri ?? null),
+        name: headline,
+        price,
+        oldPrice,
+        badge,
+        cta,
+        // A variant brings its palette; the QA recipe uses the editor's.
+        palette: recipeUsed.palette ?? palette,
+        // Authored for 9:16; 4:5 and 1:1 re-lay the texts (ratioLayout).
+        ratio: shape,
+        quality,
+        music,
+        watermark,
+      }) as ProductVideoSpec & { ratio: AspectRatio };
+    return null;
+  }
 
   // The beat is made on the phone for the video's length (cached by
   // pattern, tempo and seconds); only the pattern is stored in drafts.
@@ -1173,11 +1258,22 @@ export default function CreateProductVideo() {
     return { ...made, music: { uri, volume: 0.8 } };
   }
 
-  // Texts the user typed that the engine left out to keep the product large.
+  // Metin shows only the fields this mode uses (all for the classic ones).
+  const textFields = usedTextFields(
+    isRecipe ? recipeUsed?.recipe : null,
+    editorial,
+  );
+  // Texts the user typed that the engine left out to keep the product large
+  // (recipes: over the text limit or no room left).
   const dropped = spec?.dropped ?? [];
   const droppedNote =
     dropped.length === 0
       ? null
+      : isRecipe || editorial
+        ? t(
+            "Bazı yazılar sığmadığı için videoya eklenmedi.",
+            "Some texts did not fit and were left out of the video.",
+          )
       : dropped.includes("cta") && dropped.includes("badge")
         ? t(
             "Ürün küçülmesin diye buton yazısı ve etiket bu videoda gösterilmiyor.",
@@ -1255,9 +1351,13 @@ export default function CreateProductVideo() {
             ...(variantId ? { variant: variantId } : {}),
             // A file URI here; draft-store copies it next to the JSON.
             ...(photo0 ? { photo: photo0 } : {}),
+            // File URIs here too (draft-store copies them).
+            ...(editorial ? { editorial: true as const, aiShots } : {}),
           }
         : null,
     [
+      editorial,
+      aiShots,
       extras,
       musicChoice,
       variantId,
@@ -1388,6 +1488,7 @@ export default function CreateProductVideo() {
         discardEditorFile(photo.source);
         discardEditorFile(photo.cutout?.uri);
       }
+      for (const uri of aiShotsNow.current) discardEditorFile(uri);
     };
   }, [flushSave]);
 
@@ -1618,7 +1719,8 @@ export default function CreateProductVideo() {
     openPaywall(router, reason, { frame, ratio });
   }
 
-  const openEditor = (next: Cutout) => {
+  /** `ask`: a picked photo 1 in the editorial video asks before re-shooting. */
+  const openEditor = (next: Cutout, ask = false) => {
     // A new photo is a new video: never replace the library video being edited.
     editTarget.current = null;
     draftMeta.current = { ...draftMeta.current, sourceClip: null };
@@ -1628,6 +1730,26 @@ export default function CreateProductVideo() {
     savedKey.current = "";
     // A new photo: the AI scene was made for the old product (B7).
     setScene(null);
+    // The editorial shots too (cache files only; the sample's are bundled),
+    // unless the seller keeps them: a new photo 1 after shots were made asks
+    // first. Evet re-shoots with the current category (as "Yeniden çek":
+    // an old shot stays where a new one fails); Hayır keeps the old shots.
+    if (ask && editorial && aiShotsNow.current.some(Boolean))
+      Alert.alert(
+        t(
+          "Yeni fotoğraf için çekimler yeniden üretilsin mi?",
+          "Make the shots again for the new photo?",
+        ),
+        undefined,
+        [
+          { text: t("Hayır", "No"), style: "cancel" },
+          { text: t("Evet", "Yes"), onPress: () => shootLatest.current() },
+        ],
+      );
+    else {
+      for (const uri of aiShotsNow.current) discardEditorFile(uri);
+      setAiShots([...NO_SHOTS]);
+    }
     setCutout(next);
   };
 
@@ -1641,9 +1763,22 @@ export default function CreateProductVideo() {
         const sampleCutout = await sampleEditorCutout();
         rememberSampleCutout(sampleCutout.width, sampleCutout.height);
         openEditor(sampleCutout);
-        // Photo 1 of a recipe is the sample photo itself (photo-mode scenes).
-        const uri = await samplePhotoUri();
-        if (uri) setSourcePhoto({ cutout: sampleCutout.uri, photo: uri });
+        if (editorial) {
+          // The editorial sample: our bundled AI shots and seller photos,
+          // no network (the cut-out only keeps the editor's usual gates).
+          const sample = await editorialSample();
+          setSourcePhoto({ cutout: sampleCutout.uri, photo: sample.photos[0] });
+          setExtras(
+            sample.photos
+              .slice(1)
+              .map((source) => ({ source, cutout: null, tried: true })),
+          );
+          setAiShots(sample.ai);
+        } else {
+          // Photo 1 of a recipe is the sample photo itself (photo-mode scenes).
+          const uri = await samplePhotoUri();
+          if (uri) setSourcePhoto({ cutout: sampleCutout.uri, photo: uri });
+        }
         const copy = SAMPLE_COPY[baseLang(lang)];
         setHeadline(copy.headline);
         setPrice(copy.price);
@@ -1745,7 +1880,7 @@ export default function CreateProductVideo() {
       cutOut(photo),
       photoPixelSize(photo),
     ]);
-    openEditor(next);
+    openEditor(next, true);
     // Photo 1 of a recipe is the picked photo itself (photo-mode scenes).
     setSourcePhoto({ cutout: next.uri, photo });
     setWholePhotoUri(isWholePhotoCutout(next, size) ? next.uri : null);
@@ -1928,9 +2063,11 @@ export default function CreateProductVideo() {
         try {
           // English users get an English template name (audit F20); a recipe
           // video is named after its variant (or recipe), not the classic one.
-          const info = isRecipe
-              ? (recipeUsed?.variant ?? recipeUsed?.recipe ?? templateById(template))
-              : templateById(template),
+          const info = editorial
+              ? EDITORIAL_NAME
+              : isRecipe
+                ? (recipeUsed?.variant ?? recipeUsed?.recipe ?? templateById(template))
+                : templateById(template),
             name = t(info.tr, info.en);
           const fileName =
             (headline.trim() ? headline.trim() + " · " + name : name).slice(
@@ -2072,6 +2209,149 @@ export default function CreateProductVideo() {
     showPaywall("video");
   }
 
+  /** The progress line while the editorial shots are made ("1/3"). */
+  const shotsLabel = (n: number) =>
+    t(`Çekimler hazırlanıyor ${n}/3…`, `Preparing shots ${n}/3…`);
+  /** Resolves when the seller answers the AI consent sheet. */
+  const askConsent = () =>
+    new Promise<boolean>((resolve) => {
+      consentAnswer.current = resolve;
+      setConsentOpen(true);
+    });
+  /**
+   * The editorial video's 3 AI shots of photo 1 (one cloud request each,
+   * counted against today's allowance). Pro first (paywall, same rule as the
+   * render; after a purchase it runs), then the AI consent, then the cloud.
+   * A failure keeps the shots made so far (a re-shoot keeps the old ones
+   * where none came) and says why; the video is then made from the
+   * seller's photos.
+   */
+  function shoot() {
+    if (!editorial || !cutout || !cloudAvailable()) return;
+    if (!isPro) {
+      offerFreeExport(null);
+      // After the paywall's dismissal, or iOS drops the category sheet (F36).
+      offerAfterPurchase(() => setTimeout(() => shootLatest.current(), 700));
+      showPaywall("shots");
+      return;
+    }
+    // Before the first shots: one sheet for the category (the shots'
+    // setting), the last used one preselected. "Yeniden çek" keeps the
+    // current category.
+    if (askShotCategory.current) {
+      void loadLastCategory(CATEGORIES.map((item) => item.id)).then((last) => {
+        if (!mounted.current) return;
+        openCategorySheet(
+          t,
+          last ?? category,
+          (picked) => {
+            if (!picked || !mounted.current) return;
+            askShotCategory.current = false;
+            if (picked !== category) chooseCategory(picked);
+            else void saveLastCategory(picked);
+            makeShots(picked);
+          },
+          true,
+        );
+      });
+      return;
+    }
+    makeShots(category);
+  }
+  /**
+   * The 3 shots for `shotCategory` (Pro and the category are settled). The
+   * consent sheet comes first, so the "1/3" line only shows once the
+   * requests start. When today's known allowance has fewer than 3 left,
+   * only those are asked for.
+   */
+  function makeShots(shotCategory: CategoryId) {
+    if (!cutout || running.current) return;
+    const product = {
+      uri: cutout.uri,
+      width: cutout.width,
+      height: cutout.height,
+    };
+    void (async () => {
+      if (!(await hasAiConsent().catch(() => false))) {
+        if (!(await askConsent())) {
+          if (mounted.current)
+            setMessage(shotsNote(t, "consent-required", null, true));
+          return;
+        }
+        await grantAiConsent().catch(() => {});
+      }
+      if (mounted.current) requestShotsNow(product, shotCategory);
+    })();
+  }
+  function requestShotsNow(
+    product: { uri: string; width: number; height: number },
+    shotCategory: CategoryId,
+  ) {
+    void run(shotsLabel(1), async () => {
+      const quota = knownQuota();
+      const count = shotsToRequest(quota);
+      if (count === 0) {
+        setMessage(
+          shotsNote(
+            t,
+            "quota-exceeded",
+            quota?.resetsAt || null,
+            !aiShotsNow.current.some(Boolean),
+          ),
+        );
+        return;
+      }
+      if (count < 3) setMessage(fewShotsNote(t, count));
+      const result = await generateShots({
+        product,
+        category: shotCategory,
+        count,
+        onStep: (i) => {
+          if (mounted.current) setBusy(shotsLabel(i + 1));
+        },
+      }).catch((error: unknown) => ({
+        ai: [...NO_SHOTS],
+        error: error instanceof CloudError ? error : new CloudError("failed"),
+      }));
+      if (!mounted.current || cutoutNow.current?.uri !== product.uri) {
+        // Left, or another photo came meanwhile: nothing shows these shots.
+        for (const uri of result.ai) discardEditorFile(uri);
+        return;
+      }
+      const old = aiShotsNow.current;
+      const next = mergeShots(old, result.ai);
+      for (const uri of old) if (!next.includes(uri)) discardEditorFile(uri);
+      setAiShots(next);
+      if (result.error) {
+        diag("editorial shots failed", { code: result.error.code });
+        setMessage(
+          shotsNote(
+            t,
+            result.error.code,
+            result.error.resetsAt,
+            !next.some(Boolean),
+          ),
+        );
+      }
+    });
+  }
+  const shootLatest = useRef(shoot);
+  shootLatest.current = shoot;
+  const cutoutNow = useRef(cutout);
+  cutoutNow.current = cutout;
+  // Photos picked on Home's Editoryal card: once photo 1's cut-out is made
+  // and the editor is idle, the shots are asked for (once).
+  const shotsAsked = useRef(false);
+  /** Set until the category sheet before the first shots is answered. */
+  const askShotCategory = useRef(false);
+  useEffect(() => {
+    if (!startMode.shots || shotsAsked.current) return;
+    if (!editorial || !cutout || busy || proLoading) return;
+    shotsAsked.current = true;
+    askShotCategory.current = true;
+    shootLatest.current();
+  }, [startMode.shots, editorial, cutout, busy, proLoading]);
+
   const colors = paletteById(palette),
     bank = bankSuggestions(category, baseLang(lang)),
     locked = !!busy;
@@ -2090,6 +2370,8 @@ export default function CreateProductVideo() {
     lookTouched.current = true;
     const next = categoryById(id);
     setCategory(id);
+    // Preselected the next time the editorial video asks for a category.
+    void saveLastCategory(id);
     if (!styleChosen) {
       setPalette(next.palette);
       // The single flow keeps its one template.
@@ -2301,6 +2583,9 @@ export default function CreateProductVideo() {
       return;
     }
     if (!specInput) return;
+    // Recipes and the editorial video: their own end card in that shape.
+    const made = modeSpec(style.ratio as AspectRatio, "1080p", false);
+    if (made) return saveStillToPhotos({ ...made, music: null });
     await saveStillToPhotos(
       guardAiScene(
         buildSpec({
@@ -2343,8 +2628,10 @@ export default function CreateProductVideo() {
     if (!cutout || !editState) return;
     const state = editState,
       cutoutUri = cutout.uri,
-      // The recipe as the editor shows it (9:16 only): its 9:16 video.
-      recipeSpec = isRecipe ? spec : null;
+      // Recipes and the editorial video: each shape from their own builder.
+      shapeSpec = isRecipe || editorial ? modeSpec : null,
+      // 1080p; phones under 3.5 GB of RAM make 720p (deviceQuality).
+      videoQuality = deviceQuality("1080p", memoryBytes);
     return run(t("Hepsi hazırlanıyor…", "Preparing everything…"), async () => {
       exportAllCancel.current = false;
       flushSave();
@@ -2359,19 +2646,17 @@ export default function CreateProductVideo() {
           EXPORT_ALL_STEPS,
           async (step: ExportStep) => {
             if (step.kind === "still") return saveStillStyle(step.still);
-            // Recipe mode: 9:16 is the recipe with its beat; 4:5 and 1:1 are
-            // classic renders saved without the variant.
-            const plan = exportAllStep(state, step.ratio, !!recipeSpec);
-            const videoSpec =
-              plan.recipe && recipeSpec
-                ? await withBeat({
-                    ...recipeSpec,
-                    quality: "1080p" as const,
-                    watermark: false,
-                  })
-                : await specFromState(plan.saved, cutoutUri, {
+            // Recipe and editorial modes: every shape is that video with its
+            // beat, saved with the variant / editorial fields for Düzenle.
+            const plan = exportAllStep(state, step.ratio, !!shapeSpec);
+            const built = plan.recipe
+              ? shapeSpec?.(step.ratio, videoQuality, !isPro)
+              : null;
+            const videoSpec = built
+              ? await withBeat(built)
+              : await specFromState(plan.saved, cutoutUri, {
                     ratio: step.ratio,
-                    quality: "1080p",
+                    quality: videoQuality,
                     watermark: false,
                     lang: lng,
                   });
@@ -2390,7 +2675,8 @@ export default function CreateProductVideo() {
               throw error;
             }
             try {
-              saveEdit(clip.id, plan.saved, cutoutUri);
+              // The quality actually rendered (720p on small phones).
+              saveEdit(clip.id, { ...plan.saved, quality: videoQuality }, cutoutUri);
             } catch {
               // The video is in Photos and the Library; only Düzenle is lost.
             }
@@ -3273,7 +3559,14 @@ export default function CreateProductVideo() {
                   maxHeight: panelMax,
                 })}
           >
-            {tool === "template" && SINGLE_FLOW && recipeUsed?.variant && (
+            {tool === "template" && editorial && (
+              <EditorialPanel
+                shots={aiShots}
+                onReshoot={cloudAvailable() ? shoot : undefined}
+                disabled={locked}
+              />
+            )}
+            {tool === "template" && SINGLE_FLOW && !editorial && recipeUsed?.variant && (
               <VariantChoicePanel
                 variant={recipeUsed.variant}
                 onVariant={setVariantId}
@@ -3283,7 +3576,7 @@ export default function CreateProductVideo() {
                 headerHeight={photoStripHeight(false)}
               />
             )}
-            {tool === "template" && SINGLE_FLOW && !recipeUsed?.variant && (
+            {tool === "template" && SINGLE_FLOW && !editorial && !recipeUsed?.variant && (
               <TemplateChoicePanel
                 ids={SINGLE_FLOW_TEMPLATES}
                 template={template}
@@ -3339,7 +3632,20 @@ export default function CreateProductVideo() {
                 }
               />
             )}
-            {tool === "color" && isRecipe && (
+            {tool === "color" && editorial && (
+              <View testID="recipe-background" style={styles.recipeBackground}>
+                <Text
+                  maxFontSizeMultiplier={1.3}
+                  style={styles.recipeBackgroundText}
+                >
+                  {t(
+                    "Editoryal videonun renkleri ve ışığı hazır gelir.",
+                    "The editorial video comes with its own colours and light.",
+                  )}
+                </Text>
+              </View>
+            )}
+            {tool === "color" && !editorial && isRecipe && (
               // Recipes take their colours from the variant palette: only
               // the AI scene (the opening scene) can change here.
               <View testID="recipe-background" style={styles.recipeBackground}>
@@ -3360,7 +3666,7 @@ export default function CreateProductVideo() {
                 {aiSceneButtons}
               </View>
             )}
-            {tool === "color" && !isRecipe && (
+            {tool === "color" && !editorial && !isRecipe && (
               <BackgroundPanel
                 own={
                   ownBackdrop
@@ -3403,21 +3709,27 @@ export default function CreateProductVideo() {
             )}
             {tool === "text" && (
               <TextPanel
+                shown={textFields}
                 extras={
-                  <CampaignStrip
-                    badge={badge}
-                    onBadge={setBadge}
-                    headline={headline}
-                    onHeadline={setHeadline}
-                    priceTag={priceTag}
-                    onPriceTag={setPriceTag}
-                    risk={marketplaceTextRisk(preset, {
-                      price,
-                      oldPrice,
-                      badge,
-                    })}
-                    disabled={locked}
-                  />
+                  // The editorial video shows no badge and no price tag.
+                  editorial ? undefined : (
+                    <CampaignStrip
+                      badges={!textFields || textFields.includes("badge")}
+                      priceTags={!textFields}
+                      badge={badge}
+                      onBadge={setBadge}
+                      headline={headline}
+                      onHeadline={setHeadline}
+                      priceTag={priceTag}
+                      onPriceTag={setPriceTag}
+                      risk={marketplaceTextRisk(preset, {
+                        price,
+                        oldPrice,
+                        badge,
+                      })}
+                      disabled={locked}
+                    />
+                  )
                 }
                 headline={headline}
                 onHeadline={setHeadline}
@@ -3486,9 +3798,11 @@ export default function CreateProductVideo() {
                     disabled={locked}
                   />
                 }
-                ratioLocked={isRecipe}
+                ratioLocked={isRecipe || editorial}
                 ratio={shownRatio}
                 onRatio={setRatio}
+                // Recipes and the editorial video make their stills and all
+                // three shapes from their own builder (modeSpec).
                 onStill={canSaveImage ? pressStillStyle : undefined}
                 onExportAll={canSaveImage ? pressExportAll : undefined}
                 onCancelAll={cancelExportAll}
@@ -3581,6 +3895,19 @@ export default function CreateProductVideo() {
           style={styles.renderDiag}
         />
       ) : null}
+      <ConsentSheet
+        visible={consentOpen}
+        onCancel={() => {
+          setConsentOpen(false);
+          consentAnswer.current?.(false);
+          consentAnswer.current = null;
+        }}
+        onAccept={() => {
+          setConsentOpen(false);
+          consentAnswer.current?.(true);
+          consentAnswer.current = null;
+        }}
+      />
       <ImageSetSheet
         visible={imageSetOpen}
         initial={contrastingBackdrops(backdrop, BACKDROPS)}

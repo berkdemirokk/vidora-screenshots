@@ -26,9 +26,16 @@ export function openEditor(
     duplicate?: string;
     /**
      * For a new video: template, ratio, goal (Home's intent tiles) or a
-     * gallery variant (Home's template gallery).
+     * gallery variant (Home's template gallery), or `editorial: "1"`
+     * (Home's Editoryal card).
      */
-    start?: { template?: string; ratio?: string; goal?: string; variant?: string };
+    start?: {
+      template?: string;
+      ratio?: string;
+      goal?: string;
+      variant?: string;
+      editorial?: string;
+    };
     /** Open the photo source sheet at once (Home's "Fotoğraf seç"). */
     pick?: boolean;
     /** Photos already picked on Home (gallery card): photo 1 first. */

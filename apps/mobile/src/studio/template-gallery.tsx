@@ -34,7 +34,13 @@ import {
   variantsOfRecipe,
   type GalleryCard,
 } from "../gallery";
-import { pruneGalleryPosters, useGalleryPoster } from "../gallery-posters";
+import {
+  pruneGalleryPosters,
+  useEditorialPoster,
+  useGalleryPoster,
+} from "../gallery-posters";
+import { EDITORIAL_NAME } from "../editorial-flow";
+import { EDITORIAL_DURATION } from "../recipes/editorial";
 import { usePanelSpace } from "./controls";
 import type { RecipeVariant } from "../recipes";
 import {
@@ -220,6 +226,101 @@ function Shelf({
 }
 
 /**
+ * The first shelf, "Editoryal": one large card for the editorial video (AI
+ * shots + the seller's photos). The card opens the photo library (up to 8);
+ * "Örnekle dene" opens the bundled sample. Its poster draws right away.
+ */
+function EditorialShelf({
+  onPick,
+  onSample,
+}: {
+  onPick: () => void;
+  onSample: () => void;
+}) {
+  const t = useT(),
+    photoRange = usePhotoRange();
+  const uri = useEditorialPoster(true);
+  const name = t(EDITORIAL_NAME.tr, EDITORIAL_NAME.en),
+    about = t(
+      "Yapay zekâ çekimleri ve senin fotoğraflarınla dergi tadında bir video.",
+      "A magazine-style video from AI shots and your own photos.",
+    ),
+    photos = photoRange(1, 8);
+  return (
+    <View style={styles.shelf}>
+      <Text
+        accessibilityRole="header"
+        maxFontSizeMultiplier={MaxScale.chrome}
+        style={styles.shelfTitle}
+      >
+        {name}
+      </Text>
+      <View style={styles.editorialRow}>
+        <Pressable
+          testID="gallery-editorial"
+          accessibilityRole="button"
+          accessibilityLabel={[
+            name,
+            about,
+            photos,
+            spokenDuration(t, EDITORIAL_DURATION),
+          ].join(", ")}
+          accessibilityHint={t(
+            "Fotoğraflarını seç, video hazırlansın.",
+            "Choose your photos to make the video.",
+          )}
+          onPress={onPick}
+          style={({ pressed }) => [styles.editorialPress, pressed && Press.media]}
+        >
+          <View style={styles.poster}>
+            {uri ? (
+              <Image
+                accessible={false}
+                accessibilityIgnoresInvertColors
+                source={{ uri }}
+                resizeMode="cover"
+                style={StyleSheet.absoluteFill}
+              />
+            ) : null}
+          </View>
+          <View style={styles.editorialTexts}>
+            <Text maxFontSizeMultiplier={MaxScale.chrome} style={styles.name}>
+              {about}
+            </Text>
+            <Text
+              numberOfLines={1}
+              maxFontSizeMultiplier={MaxScale.chrome}
+              style={styles.detail}
+            >
+              {photos + " · 0:" + String(EDITORIAL_DURATION).padStart(2, "0")}
+            </Text>
+          </View>
+        </Pressable>
+        <Pressable
+          testID="gallery-sample-editorial"
+          accessibilityRole="button"
+          accessibilityLabel={t("Örnekle dene", "Try a sample") + ": " + name}
+          onPress={onSample}
+          hitSlop={{ top: 4, bottom: 4 }}
+          style={({ pressed }) => [
+          styles.sample,
+          styles.editorialSample,
+          pressed && Press.text,
+        ]}
+        >
+          <Text
+            maxFontSizeMultiplier={MaxScale.chrome}
+            style={styles.sampleText}
+          >
+            {t("Örnekle dene", "Try a sample")}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+/**
  * Home's shelves. The first shelf is on Home's first screen and draws its
  * posters right after mount; `armed` lets the other shelves draw (Home turns
  * it on when the seller scrolls). `bottomInset` keeps the last shelf clear of
@@ -231,11 +332,16 @@ export const TemplateGallery = memo(function TemplateGallery({
   bottomInset,
   onPick,
   onSample,
+  onEditorial,
+  onEditorialSample,
 }: {
   armed: boolean;
   bottomInset: number;
   onPick: (variant: RecipeVariant) => void;
   onSample: (variant: RecipeVariant) => void;
+  /** The Editoryal card and its "Örnekle dene". */
+  onEditorial: () => void;
+  onEditorialSample: () => void;
 }) {
   const t = useT();
   // Older posters go once the gallery is on screen (never during render).
@@ -247,6 +353,7 @@ export const TemplateGallery = memo(function TemplateGallery({
       testID="template-gallery"
       style={[styles.gallery, { paddingBottom: bottomInset }]}
     >
+      <EditorialShelf onPick={onEditorial} onSample={onEditorialSample} />
       {galleryShelves().map((shelf, i) => (
         <Shelf
           key={shelf.id}
@@ -473,6 +580,16 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   sample: { minHeight: 44, justifyContent: "center" },
+  editorialRow: { paddingHorizontal: Space.gutter },
+  editorialPress: { flexDirection: "row", gap: Space.m },
+  // Room at the bottom of the text column for "Örnekle dene" (placed there,
+  // outside the card's button, so VoiceOver reaches both).
+  editorialTexts: { flex: 1, gap: Space.xs, paddingBottom: 44 },
+  editorialSample: {
+    position: "absolute",
+    left: Space.gutter + CARD_WIDTH + Space.m,
+    bottom: 0,
+  },
   sampleText: {
     fontFamily: Face.bold,
     fontWeight: "700",

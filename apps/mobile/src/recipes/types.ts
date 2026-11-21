@@ -1,5 +1,5 @@
 import type {
-  FrameRatio,
+  AspectRatio,
   PaletteId,
   ProductKey,
   ProductQuality,
@@ -64,7 +64,8 @@ export type RecipeInput = {
   badge: string;
   cta: string;
   palette: PaletteId;
-  ratio: FrameRatio;
+  /** Frame shape; default "9:16", which the layouts are authored for (see ratioLayout in build.ts). */
+  ratio?: AspectRatio;
   quality: ProductQuality;
   /** Optional music for the render; null or absent means none. */
   music?: { uri: string; volume: number } | null;

@@ -1,6 +1,9 @@
 // Run with: node --test apps/mobile/src/*.test.mjs
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   FREE_DAILY_EXPORTS,
   NO_ENTITLEMENT,
@@ -347,5 +350,52 @@ test("bestValueId shows no tag without a fair comparison", () => {
   assert.equal(
     bestValueId([plan(yearly, "year", 365), plan("w", "week", 7)]),
     null,
+  );
+});
+
+// Source guards for the store fixes waiting for the 1.2.0 build (Swift is
+// not compiled here): the purchase errors must reach JS as markers that
+// storeProblem / parsePurchaseStatus already understand.
+const storeSwift = readFileSync(
+  path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../modules/karevia-editor/ios/KareviaStoreModule.swift",
+  ),
+  "utf8",
+);
+const purchaseBody = storeSwift.slice(
+  storeSwift.indexOf('AsyncFunction("purchase")'),
+  storeSwift.indexOf('AsyncFunction("entitlement")'),
+);
+
+test("purchase maps StoreKit errors to statuses and markers JS knows", () => {
+  assert.match(
+    purchaseBody,
+    /catch StoreKitError\.userCancelled \{[^}]*return \["status": "cancelled"\]/,
+  );
+  for (const pattern of [
+    /catch StoreKitError\.networkError\(_\) \{\s*throw StoreFailure\.unavailable/,
+    /catch StoreKitError\.notAvailableInStorefront \{\s*throw StoreFailure\.unavailable/,
+    /catch is StoreKit\.Product\.PurchaseError \{[^}]*throw StoreFailure\.unavailable/,
+  ])
+    assert.match(purchaseBody, pattern);
+  // Ask to Buy stays a pending status.
+  assert.match(purchaseBody, /case \.pending:[^}]*return \["status": "pending"\]/);
+  assert.equal(parsePurchaseStatus({ status: "cancelled" }), "cancelled");
+  const unavailable = storeSwift.match(
+    /case \.unavailable: return "([^"]+)"/,
+  );
+  assert.ok(unavailable);
+  assert.equal(storeProblem(new Error(unavailable[1])), "unavailable");
+});
+
+test("billing grace period counts as active, billing retry does not", () => {
+  assert.match(storeSwift, /SubscriptionInfo\.status\(for: groupID\)/);
+  assert.match(storeSwift, /status\.state == \.inGracePeriod/);
+  assert.doesNotMatch(storeSwift, /inBillingRetryPeriod/);
+  // Both expiry checks (entitlement and cloud proof) consult it.
+  assert.equal(
+    storeSwift.match(/await storeInGracePeriod\(transaction\)/g)?.length,
+    2,
   );
 });

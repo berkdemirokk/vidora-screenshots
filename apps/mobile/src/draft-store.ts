@@ -7,6 +7,7 @@
  *   KareviaMedia/edits/<clipId>.json    + .png (cut-out) [+ .scene.<ext>]
  *     both with photos 2..8 as [.x<n>.<ext> + .x<n>c.png (cut-out)]
  *     and photo 1's original photo as [.p.<ext>]
+ *     and the editorial video's AI shots as [.a<n>.<ext>] (n = 1..3)
  *   KareviaMedia/backdrops/<uuid>.<ext>  own photos used as backdrops,
  *                                        shared by drafts and videos
  *
@@ -238,6 +239,73 @@ function dropOldMainPhoto(folder: Directory, id: string, keep: string | null) {
       }
 }
 
+/**
+ * The editorial AI shots (editor file URIs) copied next to the JSON as
+ * `<id>.a<n>.<ext>`, slot by slot; a shot whose file is gone becomes null.
+ * Any other copy failure throws, like the cut-out.
+ */
+function writeAiShots(
+  folder: Directory,
+  entry: string,
+  id: string,
+  list: readonly (string | null)[] | undefined,
+): (string | null)[] {
+  return [0, 1, 2].map((i) => {
+    const uri = list?.[i];
+    if (!uri) return null;
+    const ext = extOf(uri);
+    const name = `${id}.a${i + 1}.${PHOTO_EXTS.includes(ext) ? ext : "jpg"}`;
+    try {
+      copyOnce(`${entry}|a${i + 1}`, uri, new File(folder, name));
+    } catch (error) {
+      if (sourceGone(uri)) return null;
+      throw error;
+    }
+    return name;
+  });
+}
+/** Stored AI shot files of `id` that the new JSON no longer names. */
+function dropOldAiShots(
+  folder: Directory,
+  id: string,
+  keep: readonly (string | null)[],
+) {
+  for (const entry of folder.list())
+    if (
+      entry instanceof File &&
+      entry.name.startsWith(id + ".a") &&
+      !keep.includes(entry.name)
+    )
+      try {
+        entry.delete();
+      } catch {
+        // A leftover file; removed with "delete all data".
+      }
+}
+/** Cache copies of the stored AI shots; a shot whose file is gone is null. */
+function readAiShots(
+  folder: Directory,
+  list: readonly (string | null)[],
+  tag: string,
+): (string | null)[] {
+  return [0, 1, 2].map((i) => {
+    const name = list[i];
+    if (!name) return null;
+    try {
+      const source = present(new File(folder, name));
+      if (!source) return null;
+      const copy = new File(
+        Paths.cache,
+        `vidora-ai-scene-${tag}-${i + 1}.${extOf(name)}`,
+      );
+      source.copySync(copy);
+      return copy.uri;
+    } catch {
+      return null;
+    }
+  });
+}
+
 function write(
   kind: Kind,
   draft: Draft,
@@ -267,9 +335,11 @@ function write(
   }
   const extras = writeExtras(folder, entry, draft.id, draft.extraPhotos);
   const photo = writeMainPhoto(folder, entry, draft.id, draft.photo);
-  const { extraPhotos: _uris, photo: _photo, ...rest } = draft;
+  const aiShots = writeAiShots(folder, entry, draft.id, draft.aiShots);
+  const { extraPhotos: _uris, photo: _photo, aiShots: _shots, ...rest } = draft;
   void _uris;
   void _photo;
+  void _shots;
   bumpLibraryVersion();
   writeText(
     new File(folder, draft.id + ".json"),
@@ -278,11 +348,13 @@ function write(
       scene,
       ...(extras.length > 0 ? { extraPhotos: extras } : {}),
       ...(photo ? { photo } : {}),
+      ...(aiShots.some(Boolean) ? { aiShots } : {}),
     }),
   );
   // Photos removed (or renumbered) since the last save go now.
   dropOldExtras(folder, draft.id, extras);
   dropOldMainPhoto(folder, draft.id, photo);
+  dropOldAiShots(folder, draft.id, aiShots);
   // Only now, with the new JSON in place, an old scene of another type goes.
   if (oldScene && oldScene.uri !== keepScene)
     try {
@@ -361,9 +433,14 @@ function read(kind: Kind, key: string): Restored | null {
     storedScene.copySync(copy);
     scene = { ...scene, uri: copy.uri };
   } else scene = null;
-  const { photo: storedPhoto, ...withoutPhoto } = draft;
+  const { photo: storedPhoto, aiShots: storedShots, ...withoutPhoto } = draft;
   const photo = storedPhoto ? readMainPhoto(folder, storedPhoto, tag) : null;
-  const base = photo ? { ...withoutPhoto, photo } : withoutPhoto;
+  const aiShots = storedShots ? readAiShots(folder, storedShots, tag) : null;
+  const base = {
+    ...withoutPhoto,
+    ...(photo ? { photo } : {}),
+    ...(aiShots?.some(Boolean) ? { aiShots } : {}),
+  };
   if (!base.extraPhotos)
     return { draft: { ...base, scene }, cutoutUri: cutout.uri };
   const { extraPhotos: stored, ...rest } = base;

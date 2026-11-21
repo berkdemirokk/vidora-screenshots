@@ -177,10 +177,11 @@ test("every InputAccessoryView id in app/ and src/ is per input, never shared", 
 
 test("the editor's five fields each get their own bar", () => {
   const text = readFileSync(path.join(mobile, "src/studio/panels.tsx"), "utf8");
-  // Inputs and accessories come from the same list, in the same parent.
+  // Inputs and accessories come from the same list, in the same parent
+  // (only the fields the mode shows: usedTextFields).
   assert.match(
     text,
-    /const fieldList = \[name, priceField, oldPriceField, badge, cta\];/,
+    /const fieldList = \(\s*\[\s*\["name", name\],\s*\["price", priceField\],\s*\["oldPrice", oldPriceField\],\s*\["badge", badge\],\s*\["cta", cta\],?\s*\] as const\s*\)\s*\.filter\(\(\[id\]\) => on\(id\)\)/,
   );
   assert.match(
     text,

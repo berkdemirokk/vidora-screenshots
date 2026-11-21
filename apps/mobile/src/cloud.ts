@@ -16,7 +16,13 @@ import * as MediaLibrary from "expo-media-library";
 import { addFileToPhotos } from "./media";
 import * as Sharing from "expo-sharing";
 import { hasAiConsent } from "./ai-consent";
-import { collectScenes, postForJpeg, type SceneAnswer } from "./cloud-net";
+import {
+  collectScenes,
+  postForJpeg,
+  requestShots,
+  type SceneAnswer,
+} from "./cloud-net";
+import type { CategoryId } from "./product-catalog";
 import { saveStill } from "./product";
 import { buildMainImageSpec } from "./product-templates";
 import {
@@ -84,6 +90,7 @@ async function request(path: string, init: RequestInit = {}): Promise<unknown> {
 export async function getQuota(): Promise<CloudQuota> {
   const quota = parseQuota(await request("/v1/quota"));
   if (!quota) throw new CloudError("failed");
+  lastQuota = quota;
   return quota;
 }
 
@@ -132,11 +139,21 @@ async function preparePhoto(
   }
 }
 
+/**
+ * Today's allowance as of the last cloud answer that carried it (quota
+ * headers, an error body or GET /v1/quota); null until one came. Not
+ * persisted: a cold start knows nothing.
+ */
+let lastQuota: CloudQuota | null = null;
+export function knownQuota(): CloudQuota | null {
+  return lastQuota;
+}
+
 /** One POST /v1/scene: the JPEG bytes and the quota headers. */
 async function postScene(body: Uint8Array, boundary: string): Promise<SceneAnswer> {
   if (!BASE_URL) throw new CloudError("not-configured");
   const authorization = "Bearer " + (await proof());
-  return postForJpeg(
+  const answer = await postForJpeg(
     fetch,
     BASE_URL + "/v1/scene",
     {
@@ -152,7 +169,12 @@ async function postScene(body: Uint8Array, boundary: string): Promise<SceneAnswe
       body: body.buffer as ArrayBuffer,
     },
     120_000,
-  );
+  ).catch((error: unknown) => {
+    if (error instanceof CloudError && error.quota) lastQuota = error.quota;
+    throw error;
+  });
+  if (answer.quota) lastQuota = answer.quota;
+  return answer;
 }
 
 /**
@@ -192,6 +214,49 @@ export async function generateScenes(options: {
       quota: result.quota,
     };
   });
+}
+
+/**
+ * The editorial video's 3 AI shots of the product (context, hand, macro,
+ * 9:16), one request and one image of today's allowance each, saved to the
+ * cache. `category` (the editor's) picks the context setting. A failure
+ * stops the run: shots made so far come back with `error`, the rest null.
+ * Requires AI consent: throws "consent-required".
+ */
+export async function generateShots(options: {
+  product: SceneProduct;
+  category: CategoryId | null;
+  onStep?: (index: number) => void;
+  /** Shots to ask for (the first `count` of the 3); default all. */
+  count?: number;
+}): Promise<{ ai: (string | null)[]; error: CloudError | null }> {
+  if (!cloudAvailable()) throw new CloudError("not-configured");
+  if (!(await hasAiConsent())) throw new CloudError("consent-required");
+  const photo = await preparePhoto(options.product, "9:16");
+  return requestShots(
+    options.category,
+    async (fields) => {
+      const boundary = "vidora" + randomUUID().replace(/-/g, "");
+      const body = buildMultipart(
+        fields,
+        {
+          name: "photo",
+          filename: "product.jpg",
+          contentType: "image/jpeg",
+          data: photo,
+        },
+        boundary,
+      );
+      const result = await postScene(body, boundary);
+      // Same prefix as AI Sahne: the editor's cache sweep and discard know it.
+      const file = new File(Paths.cache, "vidora-ai-scene-" + randomUUID() + ".jpg");
+      file.create();
+      await file.write(result.jpeg);
+      return file.uri;
+    },
+    options.onStep,
+    options.count,
+  );
 }
 
 /** Deletes cached scenes the user did not keep. */

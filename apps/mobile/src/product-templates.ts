@@ -239,8 +239,21 @@ export type SceneInput = {
 };
 
 export type SceneTransition = {
-  kind: "cut" | "push" | "wipe" | "zoom";
+  /**
+   * blur: the previous scene grows, blurs and fades out with ghost copies over
+   * the new one; flash: hard cut with one white frame (duration ignored).
+   */
+  kind: "cut" | "push" | "wipe" | "zoom" | "blur" | "flash";
   duration: number;
+};
+
+/** Colour grade over the scenes (before texts); each -1...1, 0 = unchanged. */
+export type ProductGrade = {
+  warmth: number;
+  saturation: number;
+  contrast: number;
+  /** Positive lifts the blacks toward a warm grey; negative deepens them. */
+  fade: number;
 };
 
 export type ProductScene = {
@@ -249,10 +262,14 @@ export type ProductScene = {
   /** File uri. */
   image: string;
   /**
-   * cutout: drawn like the single-product spec; photo: cover-fills the frame;
+   * cutout: drawn like the single-product spec; photo: cover-fills the frame
+   * (keys: scale = zoom 1...3, x/y = photo point at the frame centre,
+   * rotation = camera roll about the frame centre, degrees clockwise, clamped
+   * to ±8; the engine overscans so no corner shows);
    * depth: the photo split into depth layers for a 2.5D camera move (keys:
-   * scale = dolly 1...1.4, x/y = camera offset -1...1; rotation, yaw and
-   * opacity ignored). Falls back to a still photo when depth is unavailable.
+   * scale = dolly 1...1.4, x/y = camera offset -1...1, rotation = roll as in
+   * photo; yaw and opacity ignored). Falls back to a still photo when depth
+   * is unavailable. Roll needs the 1.2.0 native build; older builds ignore it.
    */
   mode: "cutout" | "photo" | "depth";
   /** Times relative to the scene start. */
@@ -267,7 +284,7 @@ export type ProductScene = {
   shade?: number;
 };
 
-export const MAX_SCENES = 8;
+export const MAX_SCENES = 16;
 
 export type ProductVideoSpec = {
   /** Cut-out PNG with transparency. */
@@ -303,14 +320,19 @@ export type ProductVideoSpec = {
   scenes?: ProductScene[];
   /** Composite finishing; the renderer uses moderate defaults when absent. */
   look?: ProductLook;
+  /** Multi-scene videos: colour grade; absent or all 0 = none. */
+  grade?: ProductGrade;
   /**
    * Texts the user typed that `buildSpec` left out because the product would
    * otherwise have become too small (call to action first, then the badge).
+   * Recipes also list the fields of texts over LIMITS.maxTexts or with no
+   * room left (buildRecipeSpec).
    */
   dropped?: DroppedText[];
 };
 
-export type DroppedText = "cta" | "badge";
+export type DroppedText = "cta" | "badge" | "name" | "price" | "oldPrice";
+const DROPPED_TEXTS: readonly string[] = ["cta", "badge", "name", "price", "oldPrice"];
 
 export type PaletteId = "noir" | "blush" | "ivory" | "ocean" | "emerald";
 export type Palette = {
@@ -2743,7 +2765,7 @@ export function specProblems(spec: ProductVideoSpec): string[] {
   if (
     spec.dropped !== undefined &&
     (!Array.isArray(spec.dropped) ||
-      !spec.dropped.every((d) => d === "cta" || d === "badge"))
+      !spec.dropped.every((d) => DROPPED_TEXTS.includes(d)))
   )
     out.push("dropped");
   if (
@@ -2847,6 +2869,16 @@ export function specProblems(spec: ProductVideoSpec): string[] {
   )
     out.push("music");
   if (spec.scenes) out.push(...sceneProblems(spec.scenes, d));
+  if (
+    spec.grade !== undefined &&
+    !(
+      spec.grade &&
+      [spec.grade.warmth, spec.grade.saturation, spec.grade.contrast, spec.grade.fade].every(
+        (v) => fin(v) && v >= -1 && v <= 1,
+      )
+    )
+  )
+    out.push("grade");
   return out;
 }
 
@@ -2864,7 +2896,7 @@ function sceneProblems(scenes: ProductScene[], duration: number): string[] {
       out.push(n + " mode");
     if (!Array.isArray(sc.keys)) out.push(n + " keys");
     if (
-      !["cut", "push", "wipe", "zoom"].includes(sc.transition?.kind) ||
+      !["cut", "push", "wipe", "zoom", "blur", "flash"].includes(sc.transition?.kind) ||
       !fin(sc.transition.duration) ||
       sc.transition.duration < 0 ||
       sc.transition.duration > 1.5

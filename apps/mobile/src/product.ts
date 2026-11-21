@@ -89,6 +89,8 @@ type NativeProduct = {
   textAvailability?: () => Promise<unknown>;
   /** Missing in builds made before listing text: puts text on the pasteboard. */
   copyText?: (text: string) => Promise<boolean>;
+  /** Missing in builds before 1.2.0: physical RAM in bytes (synchronous). */
+  deviceMemory?: () => number;
   addListener: (
     event: "onRenderProgress",
     listener: (payload: { progress: number }) => void,
@@ -767,6 +769,24 @@ export async function copyText(text: string): Promise<boolean> {
   } catch (error) {
     diag("product: copy failed", error);
     return false;
+  }
+}
+
+/**
+ * The phone's physical RAM in bytes, for picking the render quality. Null on
+ * builds without the native function (before 1.2.0) or when it fails or
+ * reports something unusable.
+ */
+export function deviceMemoryBytes(): number | null {
+  if (typeof native?.deviceMemory !== "function") return null;
+  try {
+    const bytes = native.deviceMemory();
+    return typeof bytes === "number" && Number.isFinite(bytes) && bytes > 0
+      ? bytes
+      : null;
+  } catch (error) {
+    diag("product: device memory check failed", error);
+    return null;
   }
 }
 

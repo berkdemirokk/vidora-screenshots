@@ -21,7 +21,7 @@ function slice(text, start, end) {
 test("openEditor drops the library video link, so a resumed draft cannot replace it", () => {
   const body = slice(
     read("app/create.tsx"),
-    "const openEditor = (next: Cutout) => {",
+    "const openEditor = (next: Cutout, ask = false) => {",
     "\n  };",
   );
   assert.ok(body.includes("editTarget.current = null"));

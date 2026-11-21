@@ -1,9 +1,13 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  FEED_BAND,
   PRODUCT_CLEARANCE,
+  SPLIT_EDGE,
   beatTimes,
+  ratioLayout,
   buildRecipeSpec,
   estimateLines,
   luminance,
@@ -554,4 +558,265 @@ test("split scenes: every text sits right of the split edge, on the accent side"
       }
     }
   }
+});
+
+// MARK: Feed shapes (4:5, 1:1) for "Hepsini çıkar"
+
+const sha = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
+const LONG_NAME = "El Yapımı Seramik Kahve Fincanı Seti 2li";
+const FEED = ["4:5", "1:1"];
+const r4 = (n) => Math.round(n * 10000) / 10000;
+
+test("9:16 output matches its baseline (gaps-ui: two-line and split-edge guards in 9:16 too)", () => {
+  // Hashes of JSON.stringify(spec). The first two are unchanged since before
+  // `ratio` was honoured (docs/_snap/gaps-ratio/baseline-916.json); the
+  // all-variants hash moved when 9:16 got the two-line and split-edge guards
+  // (only long names changed).
+  assert.equal(
+    sha(buildRecipeSpec(YENI_KOLEKSIYON, fullInput(3, "ivory"))),
+    "93aaf473e12f1175a871cc1e38ed60efac8aa1cf8037634a98f61f85f4004f1f",
+  );
+  assert.equal(
+    sha(buildRecipeSpec(INDIRIM, fullInput(3, "ocean"))),
+    "7c004383ff44c2fec0948d9297ebdac5b304c0fcafbe06647f63c5ecad8c1c7e",
+  );
+  const all = VARIANTS.flatMap((v) =>
+    [1, 6].flatMap((n) =>
+      [undefined, LONG_NAME].map((name) =>
+        buildRecipeSpec(v.recipe, name ? { ...fullInput(n, v.palette), name } : fullInput(n, v.palette)),
+      ),
+    ),
+  );
+  assert.equal(sha(all), "25f95fbb0c64999284b7c547c2d30d4adf7f7ff5797d1cd345af214d0bc67862");
+  // No ratio given is 9:16.
+  for (const v of VARIANTS) {
+    const plain = fullInput(3, v.palette);
+    delete plain.ratio;
+    assert.deepEqual(buildRecipeSpec(v.recipe, plain), buildRecipeSpec(v.recipe, fullInput(3, v.palette)), v.id);
+  }
+  const l = ratioLayout();
+  assert.deepEqual([l.top, l.bottom, l.box, l.tall, l.text, l.y(0.37)], [0.14, 0.8, false, 1, 1, 0.37]);
+});
+
+/** Problems of a 4:5 / 1:1 recipe spec (the feed post rules). */
+function feedProblems(spec) {
+  const l = ratioLayout(spec.ratio);
+  const half = (t) => textHalfHeight(linesOf(t), t.size, t.fill !== "", l.tall);
+  const out = [];
+  for (const t of spec.texts) {
+    if (t.y - half(t) < FEED_BAND.top - 1e-9 || t.y + half(t) > FEED_BAND.bottom + 1e-9)
+      out.push(`"${t.text}" leaves the band (${t.y} +- ${half(t).toFixed(4)})`);
+    if (linesOf(t) > 2) out.push(`"${t.text}" takes ${linesOf(t)} lines`);
+    const max = textMaxWidth(t.size, t.fill !== "");
+    for (const word of t.text.split(" "))
+      if (textWidth(word, t.size, t.font ?? "system", t.tracking ?? 0) > max) out.push(`"${t.text}" word ${word} too wide`);
+    // Lines stay inside the 0.06 side margins.
+    if (max > 1 - 2 * FEED_BAND.side + 1e-9) out.push(`"${t.text}" line width ${max}`);
+  }
+  spec.scenes.forEach((s, i) => {
+    const end = i + 1 < spec.scenes.length ? spec.scenes[i + 1].start : spec.duration;
+    if (s.mode === "cutout") {
+      for (const k of s.keys)
+        if (k.y - k.scale / 2 < -1e-9 || k.y + k.scale / 2 > 1 + 1e-9) out.push(`scene ${i} product leaves the frame`);
+      for (const t of spec.texts) {
+        if (t.end <= s.start || t.start >= end) continue;
+        for (const k of s.keys) {
+          const top = k.y - k.scale / 2,
+            bottom = k.y + k.scale / 2;
+          if (!(t.y + half(t) <= top - PRODUCT_CLEARANCE + 1e-6 || t.y - half(t) >= bottom + PRODUCT_CLEARANCE - 1e-6))
+            out.push(`"${t.text}" within ${PRODUCT_CLEARANCE} of the product in scene ${i}`);
+        }
+      }
+    }
+    // Split scenes: centred texts stay right of the edge, on the accent side.
+    const edge = s.background?.split;
+    if (edge)
+      for (const t of spec.texts.filter((x) => x.start >= s.start && x.start < end)) {
+        const w = Math.min(textWidth(t.text, t.size, t.font ?? "system", t.tracking ?? 0), 0.86) / 2;
+        if (0.5 - w < edge) out.push(`"${t.text}" crosses the split edge`);
+      }
+  });
+  spec.texts.forEach((a, i) =>
+    spec.texts.slice(i + 1).forEach((b) => {
+      if (a.end <= b.start || b.end <= a.start) return;
+      if (Math.abs(a.y - b.y) < half(a) + half(b) - 1e-6) out.push(`"${a.text}" overlaps "${b.text}"`);
+    }),
+  );
+  return out;
+}
+
+test("feed shapes: every variant, 1 and 6 photos, every name length, lays out in 4:5 and 1:1", () => {
+  for (const ratio of FEED)
+    for (const v of VARIANTS)
+      for (const n of [1, 6])
+        for (const name of NAMES) {
+          const spec = buildRecipeSpec(v.recipe, { ...fullInput(n, v.palette), name, ratio });
+          const tag = `${v.id} ${ratio} (${n} photos) "${name}"`;
+          assert.equal(spec.ratio, ratio, tag);
+          assert.deepEqual(specProblems(spec), [], tag);
+          assert.deepEqual(feedProblems(spec), [], tag);
+          assert.ok(spec.texts.some((t) => t.text === name), tag + " keeps the name");
+          const floor = 0.04 * ratioLayout(ratio).text;
+          assert.ok(spec.texts.every((t) => t.size >= floor - 1e-9), tag + " text size floor");
+        }
+});
+
+test("feed shapes: long prices and empty fields still lay out", () => {
+  for (const ratio of FEED)
+    for (const r of RECIPES) {
+      const long = buildRecipeSpec(r, { ...fullInput(3, "noir"), price: "1.249,90 TL", oldPrice: "1.499,90 TL", ratio });
+      assert.deepEqual([...specProblems(long), ...feedProblems(long)], [], `${r.id} ${ratio} long price`);
+      const bare = buildRecipeSpec(r, { ...fullInput(1, "ivory"), oldPrice: "", badge: "", cta: "", ratio });
+      assert.deepEqual([...specProblems(bare), ...feedProblems(bare)], [], `${r.id} ${ratio} bare`);
+    }
+});
+
+test("feed shapes: short names keep the designed size times the shape's text factor", () => {
+  for (const ratio of FEED) {
+    const k = ratioLayout(ratio).text;
+    for (const r of RECIPES) {
+      const spec = buildRecipeSpec(r, { ...fullInput(6, "ivory"), name: "Gömlek", ratio });
+      const designed = r.texts.filter((t) => t.field === "name");
+      const built = spec.texts.filter((t) => t.text === "Gömlek");
+      assert.equal(built.length, designed.length, `${r.id} ${ratio}`);
+      built.forEach((t, i) => assert.equal(t.size, r4(designed[i].size * k), `${r.id} ${ratio}`));
+    }
+  }
+});
+
+test("feed shapes: products keep their size (1:1 grows up to 15 %), photos their point with more zoom, depth pushes in", () => {
+  for (const ratio of FEED) {
+    const l = ratioLayout(ratio);
+    for (const r of RECIPES) {
+      const tall = buildRecipeSpec(r, fullInput(6, "ivory"));
+      const feed = buildRecipeSpec(r, { ...fullInput(6, "ivory"), ratio });
+      assert.equal(feed.scenes.length, tall.scenes.length, r.id);
+      feed.scenes.forEach((s, i) => {
+        const was = tall.scenes[i];
+        const tag = `${r.id} ${ratio} scene ${i}`;
+        assert.equal(s.mode, was.mode, tag);
+        assert.deepEqual(s.background, was.background, tag);
+        s.keys.forEach((k, j) => {
+          const w = was.keys[j];
+          assert.equal(k.t, w.t, tag);
+          assert.equal(k.x, w.x, tag);
+          if (s.mode === "cutout") {
+            if (ratio === "4:5") assert.equal(k.scale, w.scale, tag + " product size");
+            else {
+              assert.ok(k.scale >= w.scale - 1e-9, tag + " product never shrinks");
+              assert.ok(k.scale <= r4(w.scale * 1.15) + 1e-9, tag + " grows at most 15 %");
+            }
+          }
+          else {
+            assert.equal(k.y, w.y, tag + " photo point");
+            if (s.mode === "photo") assert.equal(k.scale, r4(Math.min(3, Math.max(1, w.scale) * l.zoom)), tag);
+            else assert.ok((k.scale > w.scale || w.scale >= 1.4) && k.scale <= 1.4, tag + " dolly");
+          }
+        });
+        if (s.mode === "depth")
+          s.keys.forEach((k, j) => j && assert.equal(Math.sign(k.scale - s.keys[j - 1].scale), Math.sign(was.keys[j].scale - was.keys[j - 1].scale), "dolly direction"));
+      });
+      // The end card keeps its 44 %+ product, fully in frame and clear of its texts.
+      const last = feed.scenes.at(-1);
+      assert.ok(last.keys.at(-1).scale >= 0.44, r.id + " end card");
+    }
+  }
+  assert.equal(ratioLayout("4:5").zoom, 1.1);
+  assert.equal(ratioLayout("1:1").zoom, 1.2);
+  assert.deepEqual(FEED_BAND, { top: 0.08, bottom: 0.92, side: 0.06 });
+});
+
+test("feed shapes: split-scene texts sit right of the edge, on the accent side", () => {
+  for (const ratio of FEED)
+    for (const recipe of [INDIRIM, YENI_KOLEKSIYON])
+      for (const price of ["349 TL", "1.249,90 TL", "12.499,90 TL"]) {
+        const spec = buildRecipeSpec(recipe, { ...fullInput(3, "noir"), price, ratio });
+        const split = spec.scenes.filter((s) => s.background?.split);
+        assert.ok(split.length >= 1, recipe.id);
+        for (const scene of split) {
+          assert.equal(scene.background.split, SPLIT_EDGE);
+          const end = spec.scenes[spec.scenes.indexOf(scene) + 1]?.start ?? spec.duration;
+          const on = spec.texts.filter((x) => x.start >= scene.start && x.start < end);
+          assert.ok(on.length >= 1, `${recipe.id} ${ratio} has texts on the split scene`);
+          for (const t of on) {
+            const half = Math.min(textWidth(t.text, t.size, t.font, t.tracking ?? 0), 0.86) / 2;
+            assert.ok(0.5 - half >= SPLIT_EDGE, `${recipe.id} ${ratio} "${t.text}" left edge ${0.5 - half}`);
+            assert.equal(t.color, paletteById("noir").onAccent, `${recipe.id} ${ratio} "${t.text}" accent-side colour`);
+          }
+        }
+      }
+});
+
+// MARK: gaps-ui: 9:16 guards, square product growth, dropped texts
+
+test("9:16: every variant keeps every text to two lines and right of the split edge", () => {
+  for (const v of VARIANTS)
+    for (const name of NAMES)
+      for (const price of ["349 TL", "12.499,90 TL"]) {
+        const spec = buildRecipeSpec(v.recipe, { ...fullInput(6, v.palette), name, price });
+        const tag = `${v.id} "${name}" ${price}`;
+        assert.deepEqual(specProblems(spec), [], tag);
+        for (const t of spec.texts) assert.ok(linesOf(t) <= 2, `${tag} "${t.text}" ${linesOf(t)} lines`);
+        spec.scenes.forEach((s, i) => {
+          const edge = s.background?.split;
+          if (!edge) return;
+          const end = spec.scenes[i + 1]?.start ?? spec.duration;
+          for (const t of spec.texts.filter((x) => x.start >= s.start && x.start < end)) {
+            const half = Math.min(textWidth(t.text, t.size, t.font ?? "system", t.tracking ?? 0), 0.86) / 2;
+            assert.ok(0.5 - half >= edge - 1e-9, `${tag} "${t.text}" crosses the edge`);
+          }
+        });
+        assert.equal(spec.dropped, undefined, tag + " nothing left out");
+      }
+});
+
+test("1:1: hero products grow by up to 15 % where texts stay 0.025 clear", () => {
+  let full = 0;
+  for (const r of RECIPES) {
+    const feed = buildRecipeSpec(r, { ...fullInput(6, "ivory"), ratio: "4:5" });
+    const square = buildRecipeSpec(r, { ...fullInput(6, "ivory"), ratio: "1:1" });
+    assert.deepEqual(feedProblems(square), [], r.id);
+    square.scenes.forEach((s, i) => {
+      if (s.mode !== "cutout") return;
+      const grow = Math.max(...s.keys.map((k) => k.scale)) / Math.max(...feed.scenes[i].keys.map((k) => k.scale));
+      assert.ok(grow >= 1 - 1e-9 && grow <= 1.15 + 1e-3, `${r.id} scene ${i} ${grow}`);
+      if (grow > 1.149) full++;
+    });
+    // The end card has room: its product is the full 15 % larger.
+    const end = square.scenes.at(-1).keys.at(-1).scale,
+      was = feed.scenes.at(-1).keys.at(-1).scale;
+    assert.ok(Math.abs(end - r4(was * 1.15)) < 1e-3, `${r.id} end card ${was} -> ${end}`);
+  }
+  assert.ok(full >= RECIPES.length, "most heroes grow the full 15 %");
+});
+
+test("dropped texts: over the text limit or with no room, listed in spec.dropped", () => {
+  // Seven texts: the seventh (cta) is over LIMITS.maxTexts.
+  const seven = mkRecipe({
+    texts: [
+      { field: "name", start: 0.2, end: 1, y: 0.2, size: 0.07, style },
+      { field: "price", start: 1, end: 2, y: 0.2, size: 0.07, style },
+      { field: "oldPrice", start: 2, end: 3, y: 0.2, size: 0.07, style },
+      { field: "badge", start: 3, end: 4, y: 0.2, size: 0.07, style },
+      { field: "name", start: 4, end: 5, y: 0.2, size: 0.07, style },
+      { field: "price", start: 5, end: 6, y: 0.2, size: 0.07, style },
+      { field: "cta", start: 6, end: 7, y: 0.2, size: 0.07, style },
+    ],
+  });
+  const over = buildRecipeSpec(seven, mkInput({ badge: "Yeni", cta: "Al" }));
+  assert.equal(over.texts.length, LIMITS.maxTexts);
+  assert.deepEqual(over.dropped, ["cta"]);
+  assert.deepEqual(specProblems(over), []);
+  // A product filling the frame leaves no clear spot for the name.
+  const full = mkRecipe({
+    scenes: [mkScene(0, { mode: "cutout", keys: [key(0, 1), key(2, 1)] })],
+    texts: [{ field: "name", start: 0.2, end: 3, y: 0.3, size: 0.07, style }],
+  });
+  const none = buildRecipeSpec(full, mkInput({ price: "", oldPrice: "" }));
+  assert.equal(none.texts.length, 0);
+  assert.deepEqual(none.dropped, ["name"]);
+  assert.deepEqual(specProblems(none), []);
+  // Empty fields are not "dropped"; a recipe with room drops nothing.
+  const fine = buildRecipeSpec(mkRecipe(), mkInput({ oldPrice: "" }));
+  assert.equal(fine.dropped, undefined);
 });

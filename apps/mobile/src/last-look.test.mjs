@@ -1,7 +1,12 @@
 // Run with: node --test apps/mobile/src/*.test.mjs
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mergeLastLook, parseLastLook, serializeLastLook } from "./last-look.ts";
+import {
+  mergeLastLook,
+  parseLastCategory,
+  parseLastLook,
+  serializeLastLook,
+} from "./last-look.ts";
 
 const ids = ["oak", "linen"];
 
@@ -30,4 +35,13 @@ test("an empty new look keeps the remembered one", () => {
     cta: "Buy",
   });
   assert.equal(mergeLastLook(null, { backdrop: null, cta: "" }), null);
+});
+
+test("last category: only a known id comes back", () => {
+  const ids = ["cosmetics", "food", "fashion"];
+  assert.equal(parseLastCategory("food", ids), "food");
+  assert.equal(parseLastCategory("weapons", ids), null);
+  assert.equal(parseLastCategory("", ids), null);
+  assert.equal(parseLastCategory(null, ids), null);
+  assert.equal(parseLastCategory(undefined, ids), null);
 });

@@ -143,6 +143,14 @@ export type EditState = {
    * Absent on older drafts, which use the cut-out in its place.
    */
   photo?: string;
+  /** The editorial video (recipes/editorial.ts). Absent: every other draft. */
+  editorial?: true;
+  /**
+   * The editorial video's AI shots [context, hand, macro]; null = not made
+   * (the seller's photos stand in). On disk: `<id>.a<n>.<ext>` next to the
+   * JSON; in the editor: file URIs. Absent when no shot exists.
+   */
+  aiShots?: (string | null)[];
 };
 
 /** One extra photo: the picked file and, when it worked, its cut-out. */
@@ -169,6 +177,19 @@ const EXTRA_SOURCE = /^[0-9a-f-]{36}\.x[1-7]\.[a-z0-9]{1,5}$/i;
 const EXTRA_CUTOUT = /^[0-9a-f-]{36}\.x[1-7]c\.png$/i;
 /** Photo 1's stored original: `<id>.p.<ext>`. */
 const MAIN_PHOTO = /^[0-9a-f-]{36}\.p\.[a-z0-9]{1,5}$/i;
+/** An editorial AI shot n (1..3): `<id>.a<n>.<ext>`. */
+const AI_SHOT = /^[0-9a-f-]{36}\.a([1-3])\.[a-z0-9]{1,5}$/i;
+
+/** The 3 shot slots, each a stored name in its own slot or null; null when none. */
+function parseAiShots(value: unknown): (string | null)[] | null {
+  if (!Array.isArray(value)) return null;
+  const shots = [0, 1, 2].map((i) => {
+    const item: unknown = value[i];
+    const match = typeof item === "string" ? AI_SHOT.exec(item) : null;
+    return match && Number(match[1]) === i + 1 ? (item as string) : null;
+  });
+  return shots.some(Boolean) ? shots : null;
+}
 /** A variant id like "kutu-acilisi-3"; unknown ones are dropped by the editor. */
 const VARIANT_ID = /^[a-z]+(?:-[a-z]+)*-[1-9]$/;
 
@@ -331,13 +352,16 @@ export function parseEditState(value: unknown): EditState | null {
     photo =
       typeof value.photo === "string" && MAIN_PHOTO.test(value.photo)
         ? value.photo
-        : null;
+        : null,
+    aiShots = parseAiShots(value.aiShots);
   return {
     // All are left out when absent, so older drafts read as before.
     ...(extraPhotos ? { extraPhotos } : {}),
     ...(musicPattern ? { musicPattern } : {}),
     ...(variant ? { variant } : {}),
     ...(photo ? { photo } : {}),
+    ...(value.editorial === true ? { editorial: true as const } : {}),
+    ...(aiShots ? { aiShots } : {}),
     template,
     palette,
     category,
@@ -439,6 +463,10 @@ export function pickEditState(state: EditState): EditState {
     ...(state.musicPattern ? { musicPattern: state.musicPattern } : {}),
     ...(state.variant ? { variant: state.variant } : {}),
     ...(state.photo ? { photo: state.photo } : {}),
+    ...(state.editorial ? { editorial: true as const } : {}),
+    ...(state.aiShots && state.aiShots.some(Boolean)
+      ? { aiShots: [0, 1, 2].map((i) => state.aiShots?.[i] ?? null) }
+      : {}),
   };
 }
 

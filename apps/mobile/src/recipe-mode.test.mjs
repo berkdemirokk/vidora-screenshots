@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { specProblems } from "./product-templates.ts";
 import { buildRecipeSpec } from "./recipes/build.ts";
-import { VARIANTS } from "./recipes/index.ts";
+import { RECIPES, VARIANTS, usedTextFields } from "./recipes/index.ts";
 import { recipeSources } from "./editor-media.ts";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
@@ -60,28 +60,44 @@ test("recipe specs carry the watermark exactly like the classic path", () => {
   assert.equal(buildRecipeSpec(v.recipe, input(1, v.palette, { watermark: false })).watermark, false);
   assert.equal(buildRecipeSpec(v.recipe, input(1, v.palette)).watermark, false);
   const src = read("../app/create.tsx");
-  const memo = src.slice(src.indexOf("const spec = useMemo("), src.indexOf("const specDuration"));
-  const recipePart = memo.slice(memo.indexOf("buildRecipeSpec("), memo.indexOf("guardAiScene("));
-  assert.match(recipePart, /watermark: !isPro/);
+  const memo = src.slice(src.indexOf("const spec = useMemo("), src.indexOf("function modeSpec("));
+  assert.match(memo, /modeSpec\(shownRatio, effectiveQuality, !isPro\)/);
+  const mode = src.slice(src.indexOf("function modeSpec("), src.indexOf("const specDuration"));
+  const recipePart = mode.slice(mode.indexOf("buildRecipeSpec("));
+  assert.match(recipePart, /watermark,/);
+  assert.match(recipePart, /ratio: shape,/);
+  assert.match(mode.slice(0, mode.indexOf("buildRecipeSpec(")), /buildEditorialSpec\(\{[\s\S]*watermark,[\s\S]*ratio: shape,/);
 });
 
-test("create.tsx: Hepsini çıkar renders the recipe at 9:16 with its beat", () => {
+test("create.tsx: Hepsini çıkar renders recipes and the editorial video in all 3 shapes with their beat", () => {
   const src = read("../app/create.tsx");
   const all = src.slice(src.indexOf("const exportAll = () =>"), src.indexOf("const exportAllLatest"));
-  assert.match(all, /recipeSpec = isRecipe \? spec : null/);
-  assert.match(all, /const plan = exportAllStep\(state, step\.ratio, !!recipeSpec\)/);
-  assert.match(all, /plan\.recipe && recipeSpec\s*\? await withBeat\(\{/);
+  assert.match(all, /shapeSpec = isRecipe \|\| editorial \? modeSpec : null/);
+  assert.match(all, /const plan = exportAllStep\(state, step\.ratio, !!shapeSpec\)/);
+  assert.match(all, /videoQuality = deviceQuality\("1080p", memoryBytes\)/);
+  assert.match(all, /shapeSpec\?\.\(step\.ratio, videoQuality, !isPro\)/);
+  assert.match(all, /quality: videoQuality,/);
+  assert.match(all, /\? await withBeat\(built\)/);
   assert.match(all, /specFromState\(plan\.saved, cutoutUri/);
-  assert.match(all, /saveEdit\(clip\.id, plan\.saved, cutoutUri\)/);
+  assert.match(all, /saveEdit\(clip\.id, \{ \.\.\.plan\.saved, quality: videoQuality \}, cutoutUri\)/);
   assert.doesNotMatch(all, /\{ \.\.\.state, ratio: step\.ratio \}/);
+  // The buttons are back in editorial mode; stills come from the same builder.
+  assert.match(src, /onStill=\{canSaveImage \? pressStillStyle : undefined\}/);
+  assert.match(src, /onExportAll=\{canSaveImage \? pressExportAll : undefined\}/);
+  const still = src.slice(src.indexOf("async function saveStillStyle("), src.indexOf("const stillStyle = "));
+  assert.match(still, /const made = modeSpec\(style\.ratio as AspectRatio, "1080p", false\);/);
+  assert.ok(still.indexOf("modeSpec(") < still.indexOf("buildSpec("), "recipes before the classic still");
 });
 
-test("create.tsx: recipe mode locks 9:16 and hides the shape chips", () => {
+test("create.tsx: recipe mode opens at 9:16, locks the shape and hides the shape chips", () => {
   const src = read("../app/create.tsx");
-  assert.match(src, /const shownRatio: AspectRatio = isRecipe \? "9:16" : ratio;/);
+  // A 4:5 / 1:1 export reopens (Düzenle) in its shape; new recipes start at 9:16.
+  assert.match(src, /const shownRatio: AspectRatio = ratio;/);
+  assert.match(src, /if \(params\.variant && variantById\(params\.variant\)\) setRatio\("9:16"\);/);
+  assert.match(src.slice(src.indexOf("function returnToRecipe("), src.indexOf("const backVariant")), /setRatio\("9:16"\)/);
   assert.match(src, /const aspect = aspectOf\(shownRatio\)/);
   assert.match(src, /ratio: shownRatio,/);
-  assert.match(src, /ratioLocked=\{isRecipe\}/);
+  assert.match(src, /ratioLocked=\{isRecipe \|\| editorial\}/);
   assert.match(src, /ratio=\{shownRatio\}/);
   const exp = read("./editor-export.tsx");
   assert.match(exp, /\{ratioLocked \? \(/);
@@ -102,8 +118,8 @@ test("single flow: a category chooser in Çıktı, shared with the Şablon panel
 
 test("Arka plan: recipes show only the AI scene; classic picks never drop a scene silently", () => {
   const src = read("../app/create.tsx");
-  assert.match(src, /tool === "color" && isRecipe && \(/);
-  assert.match(src, /tool === "color" && !isRecipe && \(\s*<BackgroundPanel/);
+  assert.match(src, /tool === "color" && !editorial && isRecipe && \(/);
+  assert.match(src, /tool === "color" && !editorial && !isRecipe && \(\s*<BackgroundPanel/);
   assert.match(src, /scene=\{aiSceneButtons\}/);
   const pick = src.slice(src.indexOf("function pickBackdrop("), src.indexOf("function selectOwn("));
   assert.ok(pick.indexOf("if (scene)") < pick.indexOf("setScene(null)"));
@@ -132,4 +148,96 @@ test("release: version 1.2.0 and an iOS 26 SDK image for store and preview build
   const eas = JSON.parse(read("../eas.json"));
   assert.equal(eas.build.production.ios.image, "latest");
   assert.equal(eas.build.preview.ios.image, "latest");
+});
+
+test("Hepsini çıkar shapes: every variant builds its own 4:5 and 1:1 layout with the AI opening", () => {
+  for (const ratio of ["4:5", "1:1"])
+    for (const v of VARIANTS) {
+      const tag = `${v.id} ${ratio}`;
+      const tall = buildRecipeSpec(v.recipe, input(3, v.palette));
+      const spec = buildRecipeSpec(v.recipe, input(3, v.palette, { ratio }));
+      assert.equal(spec.ratio, ratio, tag);
+      assert.deepEqual(specProblems(spec), [], tag);
+      // Same scenes and images; only positions, sizes and zoom differ.
+      assert.deepEqual(
+        spec.scenes.map((s) => [s.start, s.image, s.mode]),
+        tall.scenes.map((s) => [s.start, s.image, s.mode]),
+        tag,
+      );
+      assert.equal(spec.scenes[0].image, AI, tag + " opening");
+      assert.deepEqual(spec.texts.map((t) => t.text), tall.texts.map((t) => t.text), tag);
+      assert.notDeepEqual(spec.texts.map((t) => [t.y, t.size]), tall.texts.map((t) => [t.y, t.size]), tag + " re-laid");
+      assert.equal(spec.watermark, tall.watermark, tag);
+    }
+});
+// MARK: gaps-ui
+
+test("Metin: editorial shows name and price, a recipe the fields its texts use, classic all", () => {
+  assert.deepEqual(usedTextFields(null, true), ["name", "price"]);
+  assert.deepEqual(usedTextFields(RECIPES[0], true), ["name", "price"]);
+  assert.equal(usedTextFields(null, false), null);
+  for (const r of RECIPES) {
+    const fields = usedTextFields(r, false);
+    assert.deepEqual(new Set(fields), new Set(r.texts.map((t) => t.field)), r.id);
+    assert.equal(fields.length, new Set(fields).size, r.id + " no repeats");
+  }
+  const kombin = RECIPES.find((r) => r.id === "kombin");
+  // Kombin has no old price, so Metin hides that field.
+  assert.ok(!usedTextFields(kombin, false).includes("oldPrice"));
+  const src = read("../app/create.tsx");
+  assert.match(src, /usedTextFields\(\s*isRecipe \? recipeUsed\?\.recipe : null,\s*editorial,?\s*\)/);
+  assert.match(src, /shown=\{textFields\}/);
+  assert.match(src, /editorial \? undefined : \(\s*<CampaignStrip/);
+  assert.match(src, /badges=\{!textFields \|\| textFields\.includes\("badge"\)\}/);
+  assert.match(src, /priceTags=\{!textFields\}/);
+  const panels = read("./studio/panels.tsx");
+  assert.match(panels, /shown=\{shown\}/);
+  for (const id of ["name", "price", "oldPrice", "badge", "cta"])
+    assert.ok(panels.includes(`{on("${id}") && cell(`), id);
+  const strip = read("./campaign-strip.tsx");
+  assert.match(strip, /\{badges && \(/);
+  assert.match(strip, /\{priceTags && \(/);
+});
+
+test("dropped texts: recipes and the editorial video show one quiet line", () => {
+  const src = read("../app/create.tsx");
+  const note = src.slice(src.indexOf("const droppedNote ="), src.indexOf("const droppedNote =") + 600);
+  assert.match(note, /isRecipe \|\| editorial\s*\? t\(\s*"Bazı yazılar sığmadığı için videoya eklenmedi\."/);
+  assert.match(src, /droppedNote=\{droppedNote\}/);
+});
+
+test("editorial: the category is asked once before the first shots; Yeniden çek keeps it", () => {
+  const src = read("../app/create.tsx");
+  const effect = src.slice(src.indexOf("const shotsAsked = useRef(false);"), src.indexOf("const colors = paletteById"));
+  assert.ok(effect.indexOf("askShotCategory.current = true;") < effect.indexOf("shootLatest.current();"));
+  const shoot = src.slice(src.indexOf("function shoot() {"), src.indexOf("function makeShots("));
+  // Pro first, then the sheet (last used category preselected), then the shots.
+  assert.ok(shoot.indexOf('showPaywall("shots")') < shoot.indexOf("if (askShotCategory.current)"));
+  // After a purchase the sheet waits for the paywall to finish closing (I1).
+  assert.match(shoot, /offerAfterPurchase\(\(\) => setTimeout\(\(\) => shootLatest\.current\(\), 700\)\)/);
+  assert.match(shoot, /loadLastCategory\(CATEGORIES\.map\(\(item\) => item\.id\)\)/);
+  assert.match(shoot, /openCategorySheet\(\s*t,\s*last \?\? category,/);
+  assert.match(shoot, /askShotCategory\.current = false;/);
+  assert.match(shoot, /makeShots\(picked\);/);
+  assert.match(shoot, /makeShots\(category\);\s*\}\s*\/\*\*/);
+  const make = src.slice(src.indexOf("function makeShots("), src.indexOf("const shootLatest = useRef(shoot);"));
+  assert.match(make, /generateShots\(\{\s*product,\s*category: shotCategory,\s*count,/);
+  // Consent before the busy line: "1/3" shows only once requests start (M6).
+  const consentAt = make.indexOf("askConsent()");
+  assert.ok(consentAt > 0 && consentAt < make.indexOf("run(shotsLabel(1)"));
+  // The known allowance caps the request; none left: the quota note, no request.
+  assert.match(make, /const count = shotsToRequest\(quota\);/);
+  assert.ok(make.indexOf("if (count === 0)") < make.indexOf("generateShots("));
+  assert.match(make, /if \(count < 3\) setMessage\(fewShotsNote\(t, count\)\);/);
+  assert.match(src, /void saveLastCategory\(id\);/);
+  const panels = read("./studio/panels.tsx");
+  assert.match(panels, /export function openCategorySheet\(/);
+  assert.match(panels, /shots \? t\("Devam et", "Continue"\) : t\("Vazgeç", "Cancel"\)/);
+});
+
+test("quality: Pro videos follow the phone's memory (deviceQuality)", () => {
+  const src = read("../app/create.tsx");
+  assert.match(src, /const \[memoryBytes\] = useState\(deviceMemoryBytes\);/);
+  assert.match(src, /SINGLE_FLOW\s*\? deviceQuality\("1080p", memoryBytes\)/);
+  assert.match(src, /: deviceQuality\(presetQuality\(preset\), memoryBytes\)\);/);
 });

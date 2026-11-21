@@ -68,6 +68,22 @@ private func storeProductPayload(_ product: StoreKit.Product) async -> [String: 
   ]
 }
 
+/// True when Apple reports the transaction's subscription group in the
+/// billing grace period: a renewal failed, but the subscriber keeps access
+/// while Apple retries. The billing retry period (access lost) does not count.
+/// Used only for an otherwise current entitlement whose expiry has passed.
+private func storeInGracePeriod(_ transaction: StoreKit.Transaction) async -> Bool {
+  guard let groupID = transaction.subscriptionGroupID else { return false }
+  guard let statuses = try? await StoreKit.Product.SubscriptionInfo.status(for: groupID) else {
+    return false
+  }
+  for status in statuses {
+    guard case .verified(_) = status.transaction else { continue }
+    if status.state == .inGracePeriod { return true }
+  }
+  return false
+}
+
 private func storeEntitlementPayload() async -> [String: Any] {
   var bestId: String? = nil
   var bestExpiry: Date? = nil
@@ -80,7 +96,11 @@ private func storeEntitlementPayload() async -> [String: Any] {
     if transaction.isUpgraded { continue }
 
     let expiry = transaction.expirationDate
-    if let expiry = expiry, expiry <= Date() { continue }
+    if let expiry = expiry, expiry <= Date() {
+      // Expired, unless Apple's billing grace period still grants access.
+      let inGrace = await storeInGracePeriod(transaction)
+      if !inGrace { continue }
+    }
 
     if !found {
       found = true
@@ -109,7 +129,9 @@ private func storeEntitlementPayload() async -> [String: Any] {
 /// The App Store-signed JWS of the active subscription, for the Vidora cloud
 /// worker to verify (it checks Apple's signature chain itself). Picks the
 /// same transaction as `storeEntitlementPayload`: verified, not revoked, not
-/// upgraded, not expired, latest expiry. Null when there is no subscription.
+/// upgraded, not expired (or in the billing grace period), latest expiry.
+/// Null when there is no subscription. The worker rejects an expired JWS,
+/// so a grace-period proof is refused there until Apple renews.
 private func storeSubscriptionProof() async -> [String: Any] {
   var best: (jws: String, transaction: StoreKit.Transaction)? = nil
 
@@ -118,7 +140,11 @@ private func storeSubscriptionProof() async -> [String: Any] {
     guard transaction.revocationDate == nil else { continue }
     guard transaction.productType == .autoRenewable else { continue }
     if transaction.isUpgraded { continue }
-    if let expiry = transaction.expirationDate, expiry <= Date() { continue }
+    if let expiry = transaction.expirationDate, expiry <= Date() {
+      // Same grace-period rule as storeEntitlementPayload.
+      let inGrace = await storeInGracePeriod(transaction)
+      if !inGrace { continue }
+    }
 
     if let current = best {
       if let expiry = transaction.expirationDate,
@@ -220,22 +246,37 @@ public class KareviaStoreModule: Module {
         throw StoreFailure.unavailable
       }
 
-      let result = try await product.purchase()
-      switch result {
-      case .success(let verification):
-        switch verification {
-        case .verified(let transaction):
-          await transaction.finish()
-          return ["status": "purchased"]
-        case .unverified:
-          throw StoreFailure.unverified
+      // StoreFailure thrown inside the do block matches none of the catches
+      // below and reaches JS unchanged; any other error is rethrown as before.
+      do {
+        let result = try await product.purchase()
+        switch result {
+        case .success(let verification):
+          switch verification {
+          case .verified(let transaction):
+            await transaction.finish()
+            return ["status": "purchased"]
+          case .unverified:
+            throw StoreFailure.unverified
+          }
+        case .userCancelled:
+          return ["status": "cancelled"]
+        case .pending:
+          // Ask to Buy: a parent must approve; Transaction.updates delivers it.
+          return ["status": "pending"]
+        @unknown default:
+          return ["status": "cancelled"]
         }
-      case .userCancelled:
+      } catch StoreKitError.userCancelled {
+        // The user dismissed the App Store sign-in sheet.
         return ["status": "cancelled"]
-      case .pending:
-        return ["status": "pending"]
-      @unknown default:
-        return ["status": "cancelled"]
+      } catch StoreKitError.networkError(_) {
+        throw StoreFailure.unavailable
+      } catch StoreKitError.notAvailableInStorefront {
+        throw StoreFailure.unavailable
+      } catch is StoreKit.Product.PurchaseError {
+        // Purchases not allowed (Screen Time), product unavailable, offer errors.
+        throw StoreFailure.unavailable
       }
     }
 

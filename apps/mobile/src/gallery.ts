@@ -4,7 +4,7 @@
  * shelves are drawn by `src/studio/template-gallery.tsx`, the posters by
  * `src/gallery-posters.ts`.
  */
-import type { PaletteId } from "./product-templates";
+import type { PaletteId, ProductVideoSpec } from "./product-templates";
 import { buildRecipeSpec } from "./recipes/build.ts";
 import { VARIANTS, variantById, type RecipeVariant } from "./recipes/index.ts";
 import type { TemplateRecipe } from "./recipes/types";
@@ -123,6 +123,39 @@ const POSTER_MOMENT: Record<string, number> = {
 export function galleryPosterTime(recipeId: string, seconds: number): number {
   const at = POSTER_MOMENT[recipeId] ?? seconds * 0.6;
   return Math.min(Math.max(0.5, at), seconds - 0.2);
+}
+
+/** Scene tones that show a variant's palette, best first. */
+const POSTER_TONES = ["accent", "split", "dark"] as const;
+
+/**
+ * A variant poster's moment in its built `spec`: inside a cut-out scene in
+ * the palette's accent (else split, else dark) tone, preferring one with a
+ * text on it (60 % into the stretch the text shows; else 60 % into the
+ * scene), so each variant's poster shows its own colours instead of the
+ * light hero. Recipes without such a scene (Önce / Sonra) keep
+ * galleryPosterTime.
+ */
+export function tonedPosterTime(
+  recipe: TemplateRecipe,
+  spec: ProductVideoSpec,
+): number {
+  const scenes = spec.scenes ?? [];
+  const toned = POSTER_TONES.flatMap((tone) =>
+    scenes.flatMap((s, i) =>
+      s.mode === "cutout" && recipe.scenes[i]?.tone === tone
+        ? [{ start: s.start, end: scenes[i + 1]?.start ?? spec.duration }]
+        : [],
+    ),
+  ).map(({ start, end }) => {
+    const text = spec.texts.find((t) => t.start < end && t.end > start);
+    return text
+      ? { text: true, from: Math.max(start, text.start), to: Math.min(end, text.end) }
+      : { text: false, from: start, to: end };
+  });
+  const pick = toned.find((c) => c.text) ?? toned[0];
+  if (!pick) return galleryPosterTime(recipe.id, spec.duration);
+  return Math.round((pick.from + (pick.to - pick.from) * 0.6) * 100) / 100;
 }
 
 /** What the editor builds: a recipe (with its palette, null = the editor's) or none. */

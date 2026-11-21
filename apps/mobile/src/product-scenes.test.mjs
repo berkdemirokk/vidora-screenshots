@@ -100,3 +100,43 @@ test("depth mode is a valid scene mode", () => {
   const p = specProblems(withScenes([scene(0), scene(3, { mode: "depths" })]));
   assert.ok(p.some((x) => x.includes("mode")), p.join());
 });
+
+test("16 scenes with 16 photos pass, 17 do not", () => {
+  assert.equal(MAX_SCENES, 16);
+  const sixteen = Array.from({ length: 16 }, (_, i) => scene(i * 0.75));
+  assert.deepEqual(specProblems(withScenes(sixteen, 13)), []);
+  const seventeen = Array.from({ length: 17 }, (_, i) => scene(i * 0.75));
+  const p = specProblems(withScenes(seventeen, 13));
+  assert.ok(p.includes("scenes count"), p.join());
+});
+
+test("blur and flash are valid transitions, others are not", () => {
+  for (const transition of [
+    { kind: "blur", duration: 0.25 },
+    { kind: "flash", duration: 0 },
+  ])
+    assert.deepEqual(specProblems(withScenes([scene(0), scene(3, { transition })])), []);
+  const p = specProblems(
+    withScenes([scene(0), scene(3, { transition: { kind: "spin", duration: 0.3 } })]),
+  );
+  assert.ok(p.some((x) => x.includes("transition")), p.join());
+});
+
+test("grade values must be finite and within -1...1", () => {
+  const grade = { warmth: 0.4, saturation: -0.2, contrast: 0.1, fade: 0.3 };
+  assert.deepEqual(specProblems({ ...withScenes([scene(0)]), grade }), []);
+  assert.deepEqual(
+    specProblems({ ...withScenes([scene(0)]), grade: { warmth: -1, saturation: 1, contrast: 0, fade: 0 } }),
+    [],
+  );
+  for (const bad of [
+    { ...grade, warmth: 1.1 },
+    { ...grade, saturation: -1.01 },
+    { ...grade, contrast: Number.NaN },
+    { ...grade, fade: undefined },
+    null,
+  ]) {
+    const p = specProblems({ ...withScenes([scene(0)]), grade: bad });
+    assert.ok(p.includes("grade"), JSON.stringify(bad) + ": " + p.join());
+  }
+});

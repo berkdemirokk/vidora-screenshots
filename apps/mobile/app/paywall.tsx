@@ -59,6 +59,7 @@ const REASONS: readonly PaywallReason[] = [
   "marketplace",
   "ai",
   "desk",
+  "shots",
 ];
 const RATIO_ASPECT: Record<string, number> = {
   "9x16": 9 / 16,
@@ -100,8 +101,11 @@ export default function Paywall() {
     params.reason === "video" ||
     params.reason === "image" ||
     params.reason === "desk";
+  // The editorial video's AI shots are in this build too: their own copy.
   const reason = SINGLE_FLOW
-    ? ("video" as const)
+    ? params.reason === "shots"
+      ? ("shots" as const)
+      : ("video" as const)
     : (REASONS.find((item) => item === params.reason) ?? null);
 
   const [chosen, setChosen] = useState(PRO_MONTHLY),
@@ -278,7 +282,9 @@ export default function Paywall() {
             ? t("Yapay zekâyla öneri al", "Get AI suggestions")
             : reason === "desk"
               ? t("Kurgunu video olarak kaydet", "Save your edit as a video")
-              : t(
+              : reason === "shots"
+                ? t("Yapay zekâ çekimleri", "AI shots")
+                : t(
                   "Videolarını ve görsellerini kaydet",
                   "Save your videos and images",
                 );
@@ -292,7 +298,12 @@ export default function Paywall() {
         ? t("Yapay zekâyla metin önerileri", "AI text suggestions")
         : reason === "desk"
           ? t("Kurgu masası", "Editing desk")
-          : SINGLE_FLOW
+          : reason === "shots"
+            ? t(
+                "Ürünün için 3 profesyonel çekim üretilir; günlük hak Pro ile.",
+                "3 professional shots are made for your product; the daily allowance comes with Pro.",
+              )
+            : SINGLE_FLOW
             ? t(
                 "1080p videolar Fotoğraflar'a kaydedilir, filigran yok",
                 "1080p videos saved to Photos, no watermark",
