@@ -11,6 +11,7 @@ import {
   type ProductKey,
   type ProductQuality,
   type ProductScene,
+  type ProductBackground,
   type ProductText,
   type ProductVideoSpec,
   type SceneTransition,
@@ -409,6 +410,20 @@ const DETAY: EditorialCut = {
   poster: 3.9,
 };
 
+/** Soft shadow on every editorial text so thin type holds over bright photo areas. */
+const TEXT_SHADOW = 0.5;
+
+/** Warm neutral paper behind card collages (not the campaign template's pink). */
+const CARDS_BACKDROP: ProductBackground = {
+  top: "#EFE6DA",
+  bottom: "#DCCFBF",
+  glow: "#F6EFE6",
+  floor: false,
+  image: "",
+  imageX: 0,
+  imageWidth: 1,
+};
+
 /** Seller-photo-led: 96 bpm, one photo a beat (each one at least once), one depth, ends on the context. */
 const LOOKBOOK: EditorialCut = {
   id: "lookbook",
@@ -441,7 +456,8 @@ const LOOKBOOK: EditorialCut = {
   title: {
     start: 0.2,
     end: 1.25,
-    y: 0.68,
+    // Sky of the opening lavender shot, in line with the other cuts' titles.
+    y: 0.2,
     // Handwritten accent: a normal name fits one line, a long one wraps to
     // two (never upper case, never letter-spaced).
     font: "script",
@@ -638,6 +654,7 @@ export function buildEditorialSpec(
     if (cards) {
       scene.mode = "cards";
       scene.images = cards;
+      scene.background = { ...CARDS_BACKDROP };
     }
     return scene;
   });
@@ -681,6 +698,7 @@ export function buildEditorialSpec(
       exit: style.exit,
       font: style.font,
       tracking: trackingFor(style.font, style.tracking),
+      shadow: TEXT_SHADOW,
     };
   };
   const texts: ProductText[] = [];

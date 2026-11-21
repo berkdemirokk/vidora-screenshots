@@ -42,6 +42,7 @@ const byId = (id) => EDITORIAL_CUTS.find((c) => c.id === id);
 test("signature cut: output unchanged by the cut refactor (hash taken before it)", () => {
   // Every shape x AI set x 0/1/4/8 photos x short/long/no name, captured
   // before EditorialCut existed (docs/_snap/editorial-cuts/).
+  // Re-pinned for editorial text shadow (only texts[*].shadow added).
   const cases = [];
   for (const ratio of RATIOS)
     for (const ai of [
@@ -71,7 +72,7 @@ test("signature cut: output unchanged by the cut refactor (hash taken before it)
   assert.equal(cases.length, 171);
   assert.equal(
     sha(cases),
-    "169cda8735f219863aa5cbf553b835f8ff995e86e6f42b31d8c33727b2516d73",
+    "80594bf2080b4da529469fb934b49b1bef22d0afcdefc58e0cc0d41273c226b6",
   );
   assert.deepEqual(build({}, SIGNATURE), build());
 });
@@ -363,4 +364,51 @@ test("Lookbook title is script: tracking 0, one line for a normal name, two for 
   // The other cuts keep their own families.
   for (const id of ["signature", "ritim", "detay"])
     assert.notEqual(build({}, byId(id)).texts[0].font, "script");
+});
+
+test("Lookbook title sits in the top band of every shape", () => {
+  for (const ratio of RATIOS) {
+    const spec = build({ ratio }, byId("lookbook"));
+    const title = spec.texts[0];
+    assert.ok(title.y < 0.3, `${ratio} ${title.y}`);
+    if (ratio === "9:16") assert.equal(title.y, 0.2);
+    else assert.ok(title.y >= FEED_BAND.top, ratio);
+  }
+});
+
+test("cards scenes carry the warm paper backdrop, other scenes none", () => {
+  for (const ratio of RATIOS) {
+    const spec = build({ photos: photos(4), ratio }, byId("lookbook"));
+    for (const sc of spec.scenes) {
+      if (sc.mode === "cards") {
+        assert.equal(sc.background.top, "#EFE6DA");
+        assert.equal(sc.background.bottom, "#DCCFBF");
+        assert.equal(sc.background.floor, false);
+        assert.equal(sc.background.image, "");
+      } else assert.equal(sc.background, undefined);
+    }
+    assert.deepEqual(specProblems(spec), []);
+  }
+});
+
+test("text shadow: validator rejects bad values", () => {
+  for (const bad of [-0.1, 1.1, NaN, Infinity]) {
+    const spec = build();
+    spec.texts[0].shadow = bad;
+    assert.ok(specProblems(spec).some((p) => p.startsWith("text")), String(bad));
+  }
+  for (const ok of [0, 0.5, 1]) {
+    const spec = build();
+    spec.texts[0].shadow = ok;
+    assert.deepEqual(specProblems(spec), []);
+  }
+});
+
+test("every editorial text carries the shadow", () => {
+  for (const cut of EDITORIAL_CUTS)
+    for (const ratio of RATIOS) {
+      const spec = build({ ratio }, cut);
+      assert.ok(spec.texts.length >= 2, cut.id);
+      for (const t of spec.texts) assert.equal(t.shadow, 0.5, cut.id);
+    }
 });

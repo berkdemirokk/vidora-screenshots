@@ -157,6 +157,8 @@ struct ProductTextSpec: Record {
   @Field var font: String = "system"
   /// Extra letter spacing in ems.
   @Field var tracking: Double = 0
+  /// 0...1 soft dark shadow behind the glyphs; 0 = the default light shadow.
+  @Field var shadow: Double = 0
 }
 
 struct ProductBackgroundSpec: Record {
@@ -2492,6 +2494,17 @@ private enum ProductRenderer {
       attributes[.strikethroughStyle] = NSUnderlineStyle.thick.rawValue
       attributes[.strikethroughColor] = UIColor(cgColor: color(text.color))
     }
+    // Editorial shadow: centred soft blur, drawn by the text itself (plain texts only).
+    let shadowStrength = text.shadow.isFinite ? max(0, min(1, text.shadow)) : 0
+    let softShadow = shadowStrength > 0 && text.fill.isEmpty
+    if softShadow {
+      let nsShadow = NSShadow()
+      nsShadow.shadowOffset = .zero
+      // Starts from the default shadow (alpha 0.35, blur 0.25) and only adds to it, so it is never weaker.
+      nsShadow.shadowBlurRadius = fontSize * (0.25 + 0.1 * CGFloat(shadowStrength))
+      nsShadow.shadowColor = UIColor.black.withAlphaComponent(0.35 + 0.4 * CGFloat(shadowStrength))
+      attributes[.shadow] = nsShadow
+    }
     let string = NSMutableAttributedString(string: text.text, attributes: attributes)
     // Letter spacing after the last character would push centred text left.
     let length = (text.text as NSString).length
@@ -2507,7 +2520,9 @@ private enum ProductRenderer {
     let padX: CGFloat = !text.fill.isEmpty ? fontSize * 0.7 : text.font == "script" ? max(4, fontSize * 0.15) : 4
     // Plain texts get room above and below for accents (İ, Ş) that tight line heights push out.
     let padY: CGFloat = text.fill.isEmpty ? max(2, fontSize * 0.15) : fontSize * 0.35
-    let size = CGSize(width: bounds.width + padX * 2, height: bounds.height + padY * 2)
+    // Room for the blur on every side; the image is placed by its centre, so the text stays put.
+    let blurPad: CGFloat = softShadow ? ceil(fontSize * 0.35 * 1.5) : 0
+    let size = CGSize(width: bounds.width + (padX + blurPad) * 2, height: bounds.height + (padY + blurPad) * 2)
     let format = UIGraphicsImageRendererFormat()
     format.scale = 1
     format.opaque = false
@@ -2518,12 +2533,12 @@ private enum ProductRenderer {
         let pill = UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: min(size.height / 2, fontSize))
         cg.addPath(pill.cgPath)
         cg.fillPath()
-      } else {
+      } else if !softShadow {
         // Soft shadow so plain text stays readable on bright backgrounds.
         cg.setShadow(offset: CGSize(width: 0, height: fontSize * 0.04), blur: fontSize * 0.25,
                      color: color("#000000", alpha: 0.35))
       }
-      string.draw(with: CGRect(x: padX, y: padY, width: bounds.width, height: bounds.height),
+      string.draw(with: CGRect(x: padX + blurPad, y: padY + blurPad, width: bounds.width, height: bounds.height),
                   options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil)
     }
     guard let cg = image.cgImage else { return nil }

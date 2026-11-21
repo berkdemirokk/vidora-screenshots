@@ -179,6 +179,8 @@ export type ProductText = {
   font?: FontStyle;
   /** Extra letter spacing in ems (-0.05...0.3), e.g. for small caps. */
   tracking?: number;
+  /** 0...1 soft dark shadow behind the glyphs (thin type on bright photos); absent = none. */
+  shadow?: number;
 };
 
 /**
@@ -313,7 +315,7 @@ export type ProductScene = {
   rotations?: number[];
   /** Times relative to the scene start. */
   keys: ProductKey[];
-  /** Cutout mode only; default spec.background. */
+  /** Cutout and cards modes; default spec.background. */
   background?: ProductBackground;
   /** Times relative to the scene start. */
   shots?: ProductShot[];
@@ -2914,7 +2916,8 @@ export function specProblems(spec: ProductVideoSpec): string[] {
       (t.strike !== undefined && typeof t.strike !== "boolean") ||
       (t.font !== undefined && !FONT_STYLES.some((f) => f.id === t.font)) ||
       (t.tracking !== undefined &&
-        (!fin(t.tracking) || t.tracking < -0.05 || t.tracking > 0.3))
+        (!fin(t.tracking) || t.tracking < -0.05 || t.tracking > 0.3)) ||
+      (t.shadow !== undefined && (!fin(t.shadow) || t.shadow < 0 || t.shadow > 1))
     )
       out.push("text " + JSON.stringify(t.text));
   if (

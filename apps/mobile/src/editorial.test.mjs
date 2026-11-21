@@ -237,16 +237,17 @@ test("9:16 output is unchanged by the ratio support (snapshot taken before it)",
   // Hashes of JSON.stringify(spec), captured before `ratio` existed
   // (full sample spec: docs/_snap/gaps-ratio/baseline-916.json), then
   // re-taken in final wave 3 (AI zoom cap 1.7, handheld roll, shot 1 shade).
+  // Re-taken after editorial text shadow (texts only gained shadow: 0.5).
   assert.equal(
     sha(build()),
-    "e84443f1eaeae9ab72fc48852d19db782630d002f5e26907ed3da08f22e19788",
+    "f0533ea480c0b2939b5eefcdc725abab6fbd3900d67566491f85ee0e92850c17",
   );
   const cases = [AI, [null, AI[1], AI[2]], [null, null, null]].flatMap((ai) =>
     [1, 6].map((n) => build({ ai, photos: photos(n) })),
   );
   assert.equal(
     sha(cases),
-    "917164aba63f7710a1d62b97127639971d89af4d97eaebe6e00cd61885bf5234",
+    "e2b667e7f87a431f8e6fe690a8e138dc02ace7ac993c7f201e945509b9b860da",
   );
   assert.deepEqual(build({ ratio: "9:16" }), build());
 });
