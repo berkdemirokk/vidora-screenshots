@@ -67,8 +67,8 @@ function tones(p: Palette) {
       };
 }
 
-/** Edge of the "split" tone: paper left of 42 % of the width, accent right of it. */
-export const SPLIT_EDGE = 0.42;
+/** Edge of the "split" tone: paper left of 22 % of the width, accent right of it; left of a centred price ("349 TL" at 0.18 spans ~0.26-0.74). */
+export const SPLIT_EDGE = 0.22;
 
 /** The cut-out background for a scene tone in a palette. */
 export function toneBackground(p: Palette, tone: SceneTone): ProductBackground {
@@ -117,7 +117,7 @@ export function toneText(
   if (tone === "accent")
     return pill ? { color: p.accent, fill: p.onAccent } : { color: p.onAccent, fill: "" };
   if (pill) return { color: p.onAccent, fill: p.accent };
-  // Texts are centred (x 0.5), right of the split edge: on the accent side.
+  // Texts are centred (x 0.5) and the edge sits left of their widest line: accent side.
   if (tone === "split") return { color: SPLIT_EDGE <= 0.5 ? p.onAccent : paperInk, fill: "" };
   return { color: tone === "dark" ? nightInk : paperInk, fill: "" };
 }
@@ -412,6 +412,12 @@ export function buildRecipeSpec(
           color: rt.onAccent ? palette.onAccent : palette.ink,
           fill: rt.onAccent ? palette.accent : "",
         };
+    // The action reads as an action: accent colour where it keeps contrast 3+.
+    if (rt.field === "cta" && !colours.fill && (tone === "light" || tone === "dark")) {
+      const bg = tone === "light" ? tones(palette).paper : tones(palette).night;
+      const [a, b] = [luminance(palette.accent), luminance(bg)];
+      if ((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= 3) colours.color = palette.accent;
+    }
     texts.push({
       text,
       start,

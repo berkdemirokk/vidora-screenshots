@@ -372,17 +372,17 @@ const toneAt = (bg, y) => {
   return mixHex(base, bg.glow, glow);
 };
 
-test("split tone: hard edge at 0.42, paper left, accent right; price checked on the accent side", () => {
+test("split tone: hard edge at 0.22, paper left, accent right; price checked on the accent side", () => {
   for (const id of ["ivory", "noir"]) {
     const p = paletteById(id);
     const bg = toneBackground(p, "split");
-    assert.equal(bg.split, 0.42, id);
+    assert.equal(bg.split, 0.22, id);
     assert.equal(bg.bottom, p.accent, id);
     assert.notEqual(bg.top, p.accent, id);
     assert.equal(toneAt(bg, 0.05), bg.bottom, id);
     const spec = buildRecipeSpec(INDIRIM, fullInput(3, id));
     assert.deepEqual(specProblems(spec), [], id);
-    assert.ok(spec.scenes.some((s) => s.background?.split === 0.42), id);
+    assert.ok(spec.scenes.some((s) => s.background?.split === 0.22), id);
   }
 });
 
@@ -539,4 +539,19 @@ test("create.tsx passes the source photo to the recipe", () => {
   assert.match(src, /\.\.\.recipeSources\(recipePhotos, /);
   assert.match(src, /setSourcePhoto\(\{ cutout: next\.uri, photo \}\)/);
   assert.match(src, /samplePhotoUri\(\)/);
+});
+
+test("split scenes: every text sits right of the split edge, on the accent side", () => {
+  for (const recipe of [INDIRIM, YENI_KOLEKSIYON]) {
+    const spec = buildRecipeSpec(recipe, fullInput(3, "noir"));
+    for (const scene of spec.scenes) {
+      const edge = scene.background?.split;
+      if (!edge) continue;
+      const end = scene.start + 2.5;
+      for (const t of spec.texts.filter((x) => x.start >= scene.start && x.start < end)) {
+        const half = Math.min(textWidth(t.text, t.size, t.font, t.tracking ?? 0), 0.86) / 2;
+        assert.ok(0.5 - half >= edge, `${recipe.id} "${t.text}" left edge ${0.5 - half} < split ${edge}`);
+      }
+    }
+  }
 });
