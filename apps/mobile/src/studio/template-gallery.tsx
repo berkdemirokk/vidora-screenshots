@@ -40,7 +40,12 @@ import {
   useGalleryPoster,
 } from "../gallery-posters";
 import { EDITORIAL_NAME } from "../editorial-flow";
-import { EDITORIAL_DURATION } from "../recipes/editorial";
+import {
+  EDITORIAL_CUTS,
+  SIGNATURE,
+  cutDuration,
+  type EditorialCut,
+} from "../recipes/editorial";
 import { usePanelSpace } from "./controls";
 import type { RecipeVariant } from "../recipes";
 import {
@@ -166,6 +171,31 @@ const GalleryCardView = memo(function GalleryCardView({
   );
 });
 
+/**
+ * How many cards of a shelf may draw: the ones on screen plus a few ahead.
+ * It only grows, so a poster once asked for is never dropped.
+ */
+function useShelfReach(): [
+  number,
+  (event: NativeSyntheticEvent<NativeScrollEvent>) => void,
+] {
+  const { width } = useWindowDimensions();
+  const step = CARD_WIDTH + CARD_GAP;
+  const [reach, setReach] = useState(
+    () => Math.ceil(width / step) + LOOK_AHEAD - 1,
+  );
+  const reachNow = useRef(reach);
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = event.nativeEvent.contentOffset.x;
+    const next = Math.ceil((x + width) / step) + LOOK_AHEAD - 1;
+    if (next > reachNow.current) {
+      reachNow.current = next;
+      setReach(next);
+    }
+  };
+  return [reach, onScroll];
+}
+
 function Shelf({
   title,
   cards,
@@ -179,22 +209,7 @@ function Shelf({
   onPick: (variant: RecipeVariant) => void;
   onSample: (variant: RecipeVariant) => void;
 }) {
-  const { width } = useWindowDimensions();
-  const step = CARD_WIDTH + CARD_GAP;
-  // How many cards may draw: the ones on screen plus a few ahead. It only
-  // grows, so a poster once asked for is never dropped.
-  const [reach, setReach] = useState(
-    () => Math.ceil(width / step) + LOOK_AHEAD - 1,
-  );
-  const reachNow = useRef(reach);
-  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const x = event.nativeEvent.contentOffset.x;
-    const next = Math.ceil((x + width) / step) + LOOK_AHEAD - 1;
-    if (next > reachNow.current) {
-      reachNow.current = next;
-      setReach(next);
-    }
-  };
+  const [reach, onScroll] = useShelfReach();
   return (
     <View style={styles.shelf}>
       <Text
@@ -225,27 +240,103 @@ function Shelf({
   );
 }
 
+/** One Editoryal card: a cut of the editorial video and its "Örnekle dene". */
+const EditorialCardView = memo(function EditorialCardView({
+  cut,
+  draw,
+  onPick,
+  onSample,
+}: {
+  cut: EditorialCut;
+  draw: boolean;
+  onPick: (cut: string) => void;
+  onSample: (cut: string) => void;
+}) {
+  const t = useT(),
+    photoRange = usePhotoRange();
+  const uri = useEditorialPoster(cut, draw);
+  const seconds = cutDuration(cut);
+  const name = t(cut.tr, cut.en),
+    about = t(cut.about.tr, cut.about.en),
+    photos = photoRange(1, 8);
+  // The signature cut keeps the card's first test ids.
+  const suffix = cut.id === SIGNATURE.id ? "" : "-" + cut.id;
+  return (
+    <View style={styles.card}>
+      <Pressable
+        testID={"gallery-editorial" + suffix}
+        accessibilityRole="button"
+        accessibilityLabel={[
+          name,
+          about,
+          photos,
+          spokenDuration(t, seconds),
+        ].join(", ")}
+        accessibilityHint={t(
+          "Fotoğraflarını seç, video hazırlansın.",
+          "Choose your photos to make the video.",
+        )}
+        onPress={() => onPick(cut.id)}
+        style={({ pressed }) => [styles.cardPress, pressed && Press.media]}
+      >
+        <View style={styles.poster}>
+          {uri ? (
+            <Image
+              accessible={false}
+              accessibilityIgnoresInvertColors
+              source={{ uri }}
+              resizeMode="cover"
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
+        </View>
+        <View style={styles.texts}>
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={MaxScale.chrome}
+            style={styles.name}
+          >
+            {name}
+          </Text>
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={MaxScale.chrome}
+            style={styles.detail}
+          >
+            {photos + " · 0:" + String(Math.round(seconds)).padStart(2, "0")}
+          </Text>
+        </View>
+      </Pressable>
+      <Pressable
+        testID={"gallery-sample-editorial" + suffix}
+        accessibilityRole="button"
+        accessibilityLabel={t("Örnekle dene", "Try a sample") + ": " + name}
+        onPress={() => onSample(cut.id)}
+        hitSlop={{ top: 4, bottom: 4 }}
+        style={({ pressed }) => [styles.sample, pressed && Press.text]}
+      >
+        <Text maxFontSizeMultiplier={MaxScale.chrome} style={styles.sampleText}>
+          {t("Örnekle dene", "Try a sample")}
+        </Text>
+      </Pressable>
+    </View>
+  );
+});
+
 /**
- * The first shelf, "Editoryal": one large card for the editorial video (AI
- * shots + the seller's photos). The card opens the photo library (up to 8);
- * "Örnekle dene" opens the bundled sample. Its poster draws right away.
+ * The first shelf, "Editoryal": the editorial video's cuts (AI shots + the
+ * seller's photos). A card opens the photo library (up to 8) with that cut;
+ * "Örnekle dene" opens it on the bundled sample. Its posters draw right away.
  */
 function EditorialShelf({
   onPick,
   onSample,
 }: {
-  onPick: () => void;
-  onSample: () => void;
+  onPick: (cut: string) => void;
+  onSample: (cut: string) => void;
 }) {
-  const t = useT(),
-    photoRange = usePhotoRange();
-  const uri = useEditorialPoster(true);
-  const name = t(EDITORIAL_NAME.tr, EDITORIAL_NAME.en),
-    about = t(
-      "Yapay zekâ çekimleri ve senin fotoğraflarınla dergi tadında bir video.",
-      "A magazine-style video from AI shots and your own photos.",
-    ),
-    photos = photoRange(1, 8);
+  const t = useT();
+  const [reach, onScroll] = useShelfReach();
   return (
     <View style={styles.shelf}>
       <Text
@@ -253,69 +344,25 @@ function EditorialShelf({
         maxFontSizeMultiplier={MaxScale.chrome}
         style={styles.shelfTitle}
       >
-        {name}
+        {t(EDITORIAL_NAME.tr, EDITORIAL_NAME.en)}
       </Text>
-      <View style={styles.editorialRow}>
-        <Pressable
-          testID="gallery-editorial"
-          accessibilityRole="button"
-          accessibilityLabel={[
-            name,
-            about,
-            photos,
-            spokenDuration(t, EDITORIAL_DURATION),
-          ].join(", ")}
-          accessibilityHint={t(
-            "Fotoğraflarını seç, video hazırlansın.",
-            "Choose your photos to make the video.",
-          )}
-          onPress={onPick}
-          style={({ pressed }) => [styles.editorialPress, pressed && Press.media]}
-        >
-          <View style={styles.poster}>
-            {uri ? (
-              <Image
-                accessible={false}
-                accessibilityIgnoresInvertColors
-                source={{ uri }}
-                resizeMode="cover"
-                style={StyleSheet.absoluteFill}
-              />
-            ) : null}
-          </View>
-          <View style={styles.editorialTexts}>
-            <Text maxFontSizeMultiplier={MaxScale.chrome} style={styles.name}>
-              {about}
-            </Text>
-            <Text
-              numberOfLines={1}
-              maxFontSizeMultiplier={MaxScale.chrome}
-              style={styles.detail}
-            >
-              {photos + " · 0:" + String(EDITORIAL_DURATION).padStart(2, "0")}
-            </Text>
-          </View>
-        </Pressable>
-        <Pressable
-          testID="gallery-sample-editorial"
-          accessibilityRole="button"
-          accessibilityLabel={t("Örnekle dene", "Try a sample") + ": " + name}
-          onPress={onSample}
-          hitSlop={{ top: 4, bottom: 4 }}
-          style={({ pressed }) => [
-          styles.sample,
-          styles.editorialSample,
-          pressed && Press.text,
-        ]}
-        >
-          <Text
-            maxFontSizeMultiplier={MaxScale.chrome}
-            style={styles.sampleText}
-          >
-            {t("Örnekle dene", "Try a sample")}
-          </Text>
-        </Pressable>
-      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
+        onScroll={onScroll}
+        scrollEventThrottle={100}
+      >
+        {EDITORIAL_CUTS.map((cut, i) => (
+          <EditorialCardView
+            key={cut.id}
+            cut={cut}
+            draw={i < reach}
+            onPick={onPick}
+            onSample={onSample}
+          />
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -339,9 +386,9 @@ export const TemplateGallery = memo(function TemplateGallery({
   bottomInset: number;
   onPick: (variant: RecipeVariant) => void;
   onSample: (variant: RecipeVariant) => void;
-  /** The Editoryal card and its "Örnekle dene". */
-  onEditorial: () => void;
-  onEditorialSample: () => void;
+  /** An Editoryal card and its "Örnekle dene", with the cut id. */
+  onEditorial: (cut: string) => void;
+  onEditorialSample: (cut: string) => void;
 }) {
   const t = useT();
   // Older posters go once the gallery is on screen (never during render).
@@ -580,16 +627,6 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   sample: { minHeight: 44, justifyContent: "center" },
-  editorialRow: { paddingHorizontal: Space.gutter },
-  editorialPress: { flexDirection: "row", gap: Space.m },
-  // Room at the bottom of the text column for "Örnekle dene" (placed there,
-  // outside the card's button, so VoiceOver reaches both).
-  editorialTexts: { flex: 1, gap: Space.xs, paddingBottom: 44 },
-  editorialSample: {
-    position: "absolute",
-    left: Space.gutter + CARD_WIDTH + Space.m,
-    bottom: 0,
-  },
   sampleText: {
     fontFamily: Face.bold,
     fontWeight: "700",

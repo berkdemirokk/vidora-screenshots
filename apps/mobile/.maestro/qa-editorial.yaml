@@ -51,6 +51,40 @@ appId: com.berkdemirok.vidora
     timeout: 60000
 - waitForAnimationToEnd:
     timeout: 4000
+# Optional CUT (workflow input "cut"): switch the editorial cut in the Şablon panel.
+- runFlow:
+    when:
+      true: ${typeof CUT !== 'undefined' && CUT != ''}
+    commands:
+      # The sample's first video starts by itself (Pro) and locks the panels: cancel it.
+      - extendedWaitUntil:
+          visible:
+            id: "render-cancel"
+          timeout: 20000
+          optional: true
+      - runFlow:
+          when:
+            visible:
+              id: "render-cancel"
+          commands:
+            - tapOn:
+                id: "render-cancel"
+                retryTapIfNoChange: false
+            - extendedWaitUntil:
+                notVisible:
+                  id: "render-cancel"
+                timeout: 60000
+      - tapOn:
+          id: "tool-template"
+      - extendedWaitUntil:
+          visible:
+            id: "editorial-cut-${CUT}"
+          timeout: 15000
+      - tapOn:
+          id: "editorial-cut-${CUT}"
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - takeScreenshot: qa-editorial-cut
 - takeScreenshot: qa-editorial-editor
 - tapOn:
     id: "render-button"

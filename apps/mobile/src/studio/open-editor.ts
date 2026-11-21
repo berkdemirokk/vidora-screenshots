@@ -26,8 +26,8 @@ export function openEditor(
     duplicate?: string;
     /**
      * For a new video: template, ratio, goal (Home's intent tiles) or a
-     * gallery variant (Home's template gallery), or `editorial: "1"`
-     * (Home's Editoryal card).
+     * gallery variant (Home's template gallery), or `editorial: "1"` and
+     * its `cut` (Home's Editoryal cards).
      */
     start?: {
       template?: string;
@@ -35,6 +35,7 @@ export function openEditor(
       goal?: string;
       variant?: string;
       editorial?: string;
+      cut?: string;
     };
     /** Open the photo source sheet at once (Home's "Fotoğraf seç"). */
     pick?: boolean;

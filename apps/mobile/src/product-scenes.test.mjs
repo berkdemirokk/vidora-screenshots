@@ -140,3 +140,51 @@ test("grade values must be finite and within -1...1", () => {
     assert.ok(p.includes("grade"), JSON.stringify(bad) + ": " + p.join());
   }
 });
+
+test("whip transition and its direction are validated", () => {
+  const ok = (transition) =>
+    specProblems(withScenes([scene(0), scene(4, { transition })]));
+  assert.deepEqual(ok({ kind: "whip", duration: 0.25 }), []);
+  assert.deepEqual(ok({ kind: "whip", duration: 0.25, direction: "up" }), []);
+  assert.deepEqual(ok({ kind: "whip", duration: 0.25, direction: "diagonal" }), ["scene 1 transition"]);
+  assert.deepEqual(ok({ kind: "whip", duration: 2 }), ["scene 1 transition"]);
+  assert.deepEqual(ok({ kind: "swirl", duration: 0.25 }), ["scene 1 transition"]);
+});
+
+test("light leaks: window inside the video, strength 0...1, at most 4", () => {
+  const leaks = (l) => specProblems({ ...withScenes([scene(0), scene(4)]), leaks: l });
+  assert.deepEqual(leaks([{ start: 1, end: 3 }, { start: 4, end: 6, strength: 1 }]), []);
+  assert.deepEqual(leaks([]), []);
+  for (const bad of [
+    [{ start: 3, end: 3 }],
+    [{ start: -1, end: 2 }],
+    [{ start: 1, end: 99 }],
+    [{ start: 1, end: 2, strength: 1.5 }],
+    [{ start: 1, end: NaN }],
+    Array.from({ length: 5 }, (_, i) => ({ start: i, end: i + 0.5 })),
+  ])
+    assert.deepEqual(leaks(bad), ["leaks"], JSON.stringify(bad));
+});
+
+test("cards scenes need 2-4 images and sane rotations; images only on cards", () => {
+  const cards = (over) =>
+    specProblems(withScenes([scene(0), scene(4, { mode: "cards", ...over })]));
+  const u = (n) => Array.from({ length: n }, (_, i) => "file:///tmp/c" + i + ".png");
+  assert.deepEqual(cards({ images: u(2) }), []);
+  assert.deepEqual(cards({ images: u(4), rotations: [-5, 4, -6, 5] }), []);
+  assert.deepEqual(cards({}), ["scene 1 cards images"]);
+  assert.deepEqual(cards({ images: u(1) }), ["scene 1 cards images"]);
+  assert.deepEqual(cards({ images: u(5) }), ["scene 1 cards images"]);
+  assert.deepEqual(cards({ images: ["a", ""] }), ["scene 1 cards images"]);
+  assert.deepEqual(cards({ images: u(2), rotations: [20] }), ["scene 1 cards rotations"]);
+  assert.deepEqual(
+    specProblems(withScenes([scene(0, { images: u(2) })])),
+    ["scene 0 images"],
+  );
+  // 16 distinct images across scenes and cards is the cap.
+  const many = Array.from({ length: 15 }, (_, i) => scene(i * 0.5, { image: "file:///tmp/m" + i + ".png" }));
+  assert.deepEqual(
+    specProblems(withScenes([...many, scene(8, { mode: "cards", image: "x1", images: ["x1", "x2"] })], 9)),
+    ["scenes images count"],
+  );
+});

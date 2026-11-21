@@ -48,7 +48,7 @@ import {
   takeChosenScene,
 } from "../src/cloud";
 import { grantAiConsent, hasAiConsent } from "../src/ai-consent";
-import { buildEditorialSpec } from "../src/recipes/editorial";
+import { buildEditorialSpec, cutById } from "../src/recipes/editorial";
 import {
   EDITORIAL_NAME,
   NO_SHOTS,
@@ -481,6 +481,8 @@ export default function CreateProductVideo() {
       photos?: string;
       /** Home's Editoryal card: the editorial video (new video only). */
       editorial?: string;
+      /** Its cut (recipes/editorial.ts EDITORIAL_CUTS); default the signature cut. */
+      cut?: string;
     }>(),
     router = useRouter(),
     t = useT(),
@@ -498,6 +500,8 @@ export default function CreateProductVideo() {
   // Its AI shots [context, hand, macro] (cache files or the bundled sample);
   // null = not made, the seller's photos stand in.
   const [aiShots, setAiShots] = useState<(string | null)[]>([...NO_SHOTS]);
+  // Its cut (Home's card, the draft, or the Şablon panel).
+  const [cutId, setCutId] = useState(() => cutById(params.cut).id);
   const aiShotsNow = useRef(aiShots);
   aiShotsNow.current = aiShots;
   // The AI consent sheet for the shots, and who waits for its answer.
@@ -681,6 +685,7 @@ export default function CreateProductVideo() {
     setMusicChoice(state.musicPattern ?? null);
     setEditorial(state.editorial === true);
     setAiShots([0, 1, 2].map((i) => state.aiShots?.[i] ?? null));
+    setCutId(cutById(state.editorialCut).id);
     // A variant this build does not know opens with the classic templates.
     setVariantId(
       state.variant && variantById(state.variant) ? state.variant : null,
@@ -1133,6 +1138,8 @@ export default function CreateProductVideo() {
     backdrop,
   });
   const beatPattern = resolveMusicPattern(musicChoice, isRecipe || editorial);
+  // The editorial cuts cut on their own tempo; the beat follows it.
+  const beatBpm = editorial ? cutById(cutId).bpm : BEAT_BPM;
 
   // Old templates draw photo 1 only: the added photos change nothing there.
   const recipePhotos = isRecipe ? photos : null;
@@ -1161,6 +1168,7 @@ export default function CreateProductVideo() {
     specInput,
     editorial,
     aiShots,
+    cutId,
     photos,
     recipePhotos,
     recipeUsed,
@@ -1188,18 +1196,21 @@ export default function CreateProductVideo() {
     const music = specInput?.music ?? null;
     if (editorial) {
       // The AI shots where made, the seller's photos for the rest.
-      return buildEditorialSpec({
-        ai: aiShots,
-        photos: photos.map((p) => p.source),
-        cutouts: photos.map((p) => p.cutout?.uri ?? null),
-        name: headline,
-        price,
-        palette,
-        music,
-        watermark,
-        quality,
-        ratio: shape,
-      }) as ProductVideoSpec & { ratio: AspectRatio };
+      return buildEditorialSpec(
+        {
+          ai: aiShots,
+          photos: photos.map((p) => p.source),
+          cutouts: photos.map((p) => p.cutout?.uri ?? null),
+          name: headline,
+          price,
+          palette,
+          music,
+          watermark,
+          quality,
+          ratio: shape,
+        },
+        cutById(cutId),
+      ) as ProductVideoSpec & { ratio: AspectRatio };
     }
     if (recipePhotos && recipeUsed)
       return buildRecipeSpec(recipeUsed.recipe, {
@@ -1228,8 +1239,8 @@ export default function CreateProductVideo() {
   useEffect(() => {
     if (!beatPattern || specDuration <= 0) return;
     let live = true;
-    const key = `${beatPattern}|${specDuration}`;
-    musicFile(beatPattern, BEAT_BPM, specDuration)
+    const key = `${beatPattern}|${beatBpm}|${specDuration}`;
+    musicFile(beatPattern, beatBpm, specDuration)
       .then((uri) => {
         if (live)
           setBeatFile((current) =>
@@ -1240,11 +1251,11 @@ export default function CreateProductVideo() {
     return () => {
       live = false;
     };
-  }, [beatPattern, specDuration]);
+  }, [beatPattern, beatBpm, specDuration]);
   /** What the preview plays: the own file, else the beat once it is made. */
   const previewMusicUri =
     spec?.music?.uri ??
-    (beatPattern && beatFile?.key === `${beatPattern}|${specDuration}`
+    (beatPattern && beatFile?.key === `${beatPattern}|${beatBpm}|${specDuration}`
       ? beatFile.uri
       : null);
   /**
@@ -1254,7 +1265,7 @@ export default function CreateProductVideo() {
    */
   async function withBeat<S extends ProductVideoSpec>(made: S): Promise<S> {
     if (made.music || !beatPattern) return made;
-    const uri = await musicFile(beatPattern, BEAT_BPM, made.duration);
+    const uri = await musicFile(beatPattern, beatBpm, made.duration);
     return { ...made, music: { uri, volume: 0.8 } };
   }
 
@@ -1352,12 +1363,15 @@ export default function CreateProductVideo() {
             // A file URI here; draft-store copies it next to the JSON.
             ...(photo0 ? { photo: photo0 } : {}),
             // File URIs here too (draft-store copies them).
-            ...(editorial ? { editorial: true as const, aiShots } : {}),
+            ...(editorial
+              ? { editorial: true as const, aiShots, editorialCut: cutId }
+              : {}),
           }
         : null,
     [
       editorial,
       aiShots,
+      cutId,
       extras,
       musicChoice,
       variantId,
@@ -3562,6 +3576,8 @@ export default function CreateProductVideo() {
             {tool === "template" && editorial && (
               <EditorialPanel
                 shots={aiShots}
+                cut={cutId}
+                onCut={setCutId}
                 onReshoot={cloudAvailable() ? shoot : undefined}
                 disabled={locked}
               />

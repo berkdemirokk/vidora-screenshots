@@ -151,6 +151,11 @@ export type EditState = {
    * JSON; in the editor: file URIs. Absent when no shot exists.
    */
   aiShots?: (string | null)[];
+  /**
+   * The editorial video's cut (recipes/editorial.ts EDITORIAL_CUTS). Absent:
+   * the signature cut (every editorial draft before the cuts).
+   */
+  editorialCut?: string;
 };
 
 /** One extra photo: the picked file and, when it worked, its cut-out. */
@@ -192,6 +197,8 @@ function parseAiShots(value: unknown): (string | null)[] | null {
 }
 /** A variant id like "kutu-acilisi-3"; unknown ones are dropped by the editor. */
 const VARIANT_ID = /^[a-z]+(?:-[a-z]+)*-[1-9]$/;
+/** An editorial cut id like "sakin-luks"; unknown ones open the signature cut. */
+const CUT_ID = /^[a-z]+(?:-[a-z]+)*$/;
 
 function parseExtraPhotos(value: unknown): ExtraPhoto[] | null {
   if (!Array.isArray(value)) return null;
@@ -353,7 +360,13 @@ export function parseEditState(value: unknown): EditState | null {
       typeof value.photo === "string" && MAIN_PHOTO.test(value.photo)
         ? value.photo
         : null,
-    aiShots = parseAiShots(value.aiShots);
+    aiShots = parseAiShots(value.aiShots),
+    editorialCut =
+      value.editorial === true &&
+      typeof value.editorialCut === "string" &&
+      CUT_ID.test(value.editorialCut)
+        ? value.editorialCut
+        : null;
   return {
     // All are left out when absent, so older drafts read as before.
     ...(extraPhotos ? { extraPhotos } : {}),
@@ -362,6 +375,7 @@ export function parseEditState(value: unknown): EditState | null {
     ...(photo ? { photo } : {}),
     ...(value.editorial === true ? { editorial: true as const } : {}),
     ...(aiShots ? { aiShots } : {}),
+    ...(editorialCut ? { editorialCut } : {}),
     template,
     palette,
     category,
@@ -466,6 +480,9 @@ export function pickEditState(state: EditState): EditState {
     ...(state.editorial ? { editorial: true as const } : {}),
     ...(state.aiShots && state.aiShots.some(Boolean)
       ? { aiShots: [0, 1, 2].map((i) => state.aiShots?.[i] ?? null) }
+      : {}),
+    ...(state.editorial && state.editorialCut
+      ? { editorialCut: state.editorialCut }
       : {}),
   };
 }

@@ -445,6 +445,26 @@ test("an editorial draft keeps its mode and AI shots (missing ones stay null)", 
   assert.equal("aiShots" in none, false);
 });
 
+test("an editorial draft keeps its cut id; older ones and odd ids have none", () => {
+  const raw = serializeDraft({ ...draft, editorial: true, editorialCut: "sakin-luks" });
+  const parsed = parseDraft(raw, ID);
+  assert.equal(parsed.editorialCut, "sakin-luks");
+  assert.equal(serializeDraft(parsed), raw, "byte-identical");
+  // Before the cuts: no field (the editor opens the signature cut).
+  const old = parseDraft(serializeDraft({ ...draft, editorial: true }), ID);
+  assert.equal("editorialCut" in old, false);
+  for (const cut of ["../x", "Ritim", 7, ""]) {
+    const odd = parseDraft(
+      JSON.stringify({ ...JSON.parse(raw), editorialCut: cut }),
+      ID,
+    );
+    assert.equal("editorialCut" in odd, false, String(cut));
+  }
+  // Only editorial drafts carry it.
+  const classic = serializeDraft({ ...draft, editorialCut: "ritim" });
+  assert.equal("editorialCut" in JSON.parse(classic), false);
+});
+
 test("an old draft has no editorial fields and stays byte-identical", () => {
   const raw = serializeDraft(draft);
   const json = JSON.parse(raw);

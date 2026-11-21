@@ -5,8 +5,9 @@
  *
  *   Library/Caches/vidora-gallery/<variantId>-<rev>.jpg
  *
- * The Editoryal card's poster ("editorial-<rev>.jpg") is drawn the same way
- * from the editorial video's bundled sample (editorial-sample.ts).
+ * The Editoryal cards' posters ("editorial-<rev>.jpg" for the signature cut,
+ * "editorial-<cutId>-<rev>.jpg" for the others) are drawn the same way from
+ * the editorial video's bundled sample (editorial-sample.ts).
  *
  * `rev` holds the app version, the native build number, GALLERY_REVISION and
  * the copy language. Posters are drawn POSTER_WIDTH pixels wide with the
@@ -27,7 +28,7 @@ import sampleProduct from "../assets/sample-product.jpg";
 import { baseLang } from "./i18n/lang";
 import { specProblems, type ProductVideoSpec } from "./product-templates";
 import { buildRecipeSpec } from "./recipes/build";
-import { buildEditorialSpec } from "./recipes/editorial";
+import { buildEditorialSpec, type EditorialCut } from "./recipes/editorial";
 import { editorialSample } from "./editorial-sample";
 import type { RecipeVariant } from "./recipes";
 import { tonedPosterTime } from "./gallery";
@@ -101,7 +102,7 @@ export function pruneGalleryPosters(): void {
   }
 }
 
-/** `id` is a variant id, or "editorial" for the Editoryal card. */
+/** `id` is a variant id, or an Editoryal card's (editorialPosterId). */
 function posterFile(id: string, lang: "tr" | "en"): File {
   const rev = revOf(lang);
   return new File(galleryDir(), `${id}-${rev}.jpg`);
@@ -236,26 +237,33 @@ export function galleryPoster(
   });
 }
 
-/** The Editoryal card's moment: the closing hero shot with name and price. */
-export const EDITORIAL_POSTER_TIME = 12.2;
+/** The signature cut keeps its first poster file name ("editorial"). */
+const editorialPosterId = (cut: EditorialCut) =>
+  cut.id === "signature" ? "editorial" : "editorial-" + cut.id;
 
-/** Draw (or reuse) the Editoryal card's poster from the bundled sample. */
-function editorialPoster(lang: "tr" | "en"): Promise<string | null> {
-  return drawnPoster("editorial", lang, async () => {
+/** Draw (or reuse) an Editoryal card's poster from the bundled sample, at the cut's own moment. */
+function editorialPoster(
+  cut: EditorialCut,
+  lang: "tr" | "en",
+): Promise<string | null> {
+  return drawnPoster(editorialPosterId(cut), lang, async () => {
     const sample = await editorialSample();
     const copy = SAMPLE_COPY[lang];
-    const spec = buildEditorialSpec({
-      ai: sample.ai,
-      photos: sample.photos,
-      cutouts: sample.photos.map(() => null),
-      name: copy.headline,
-      price: copy.price,
-      palette: "blush",
-      music: null,
-      watermark: false,
-      quality: "720p",
-    });
-    return { spec, at: EDITORIAL_POSTER_TIME };
+    const spec = buildEditorialSpec(
+      {
+        ai: sample.ai,
+        photos: sample.photos,
+        cutouts: sample.photos.map(() => null),
+        name: copy.headline,
+        price: copy.price,
+        palette: "blush",
+        music: null,
+        watermark: false,
+        quality: "720p",
+      },
+      cut,
+    );
+    return { spec, at: cut.poster };
   });
 }
 
@@ -288,7 +296,7 @@ function usePoster(
     return () => {
       live = false;
     };
-    // `draw` is fixed per id (a constant list, or the one editorial poster).
+    // `draw` is fixed per id (a constant list of variants and cuts).
   }, [key, enabled]);
   return state.key === key ? state.uri : null;
 }
@@ -306,7 +314,12 @@ export function useGalleryPoster(
   return usePoster(variant.id, enabled, (lang) => galleryPoster(variant, lang));
 }
 
-/** The Editoryal card's poster (same rules as useGalleryPoster). */
-export function useEditorialPoster(enabled: boolean): string | null {
-  return usePoster("editorial", enabled, editorialPoster);
+/** An Editoryal card's poster (same rules as useGalleryPoster). */
+export function useEditorialPoster(
+  cut: EditorialCut,
+  enabled: boolean,
+): string | null {
+  return usePoster(editorialPosterId(cut), enabled, (lang) =>
+    editorialPoster(cut, lang),
+  );
 }

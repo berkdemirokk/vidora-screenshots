@@ -780,30 +780,34 @@ export default function Studio() {
       params: { sample: "1", variant: variant.id },
     });
   }, []);
-  // The Editoryal card: up to 8 photos, then the editor in editorial mode
-  // (it asks the cloud for the AI shots); nothing picked keeps Home.
-  const pickEditorial = useCallback(async () => {
+  // An Editoryal card: up to 8 photos, then the editor in editorial mode
+  // with that cut (it asks the cloud for the AI shots); nothing picked keeps
+  // Home.
+  const pickEditorial = useCallback(async (cut: string) => {
     if (picking.current) return;
     picking.current = true;
     try {
       const photos = await pickProductPhotos(8);
       if (photos.length === 0) return;
-      openEditor(routerNow.current, { start: { editorial: "1" }, photos });
+      openEditor(routerNow.current, { start: { editorial: "1", cut }, photos });
     } catch (error) {
       diag("gallery photo pick failed", { error });
     } finally {
       picking.current = false;
     }
   }, []);
-  const onPickEditorial = useCallback(() => void pickEditorial(), [pickEditorial]);
-  // Its "Örnekle dene": the editorial video on the bundled sample shots.
-  const sampleEditorial = useCallback(() => {
+  const onPickEditorial = useCallback(
+    (cut: string) => void pickEditorial(cut),
+    [pickEditorial],
+  );
+  // Its "Örnekle dene": that cut on the bundled sample shots.
+  const sampleEditorial = useCallback((cut: string) => {
     const now = Date.now();
     if (now - sampleTapped.current < 1000) return;
     sampleTapped.current = now;
     routerNow.current.push({
       pathname: "/create",
-      params: { sample: "1", editorial: "1" },
+      params: { sample: "1", editorial: "1", cut },
     });
   }, []);
   const openClip = (clip: Clip) => {

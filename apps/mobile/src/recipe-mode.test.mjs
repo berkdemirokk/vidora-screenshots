@@ -66,7 +66,7 @@ test("recipe specs carry the watermark exactly like the classic path", () => {
   const recipePart = mode.slice(mode.indexOf("buildRecipeSpec("));
   assert.match(recipePart, /watermark,/);
   assert.match(recipePart, /ratio: shape,/);
-  assert.match(mode.slice(0, mode.indexOf("buildRecipeSpec(")), /buildEditorialSpec\(\{[\s\S]*watermark,[\s\S]*ratio: shape,/);
+  assert.match(mode.slice(0, mode.indexOf("buildRecipeSpec(")), /buildEditorialSpec\(\s*\{[\s\S]*watermark,[\s\S]*ratio: shape,/);
 });
 
 test("create.tsx: Hepsini çıkar renders recipes and the editorial video in all 3 shapes with their beat", () => {

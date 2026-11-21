@@ -188,7 +188,9 @@ test("create.tsx makes the beat when it renders, not from the preview cache", ()
   const src = readFileSync(new URL("../app/create.tsx", import.meta.url), "utf8");
   // The video render awaits the beat file itself.
   assert.match(src, /renderProductVideo\(\s*await withBeat\(spec\)/);
-  assert.match(src, /await musicFile\(beatPattern, BEAT_BPM, made\.duration\)/);
+  assert.match(src, /await musicFile\(beatPattern, beatBpm, made\.duration\)/);
+  // Editorial cuts set their own tempo; everything else keeps BEAT_BPM.
+  assert.match(src, /const beatBpm = editorial \? cutById\(cutId\)\.bpm : BEAT_BPM;/);
   // The memo spec never carries the cached beat.
   const memo = src.slice(src.indexOf("const spec = useMemo("), src.indexOf("const specDuration"));
   assert.doesNotMatch(memo, /beatFile|beatPattern/);

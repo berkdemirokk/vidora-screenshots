@@ -27,6 +27,10 @@ on:
           - discount
           - showcase
         default: campaign
+      cut:
+        description: "qa-editorial.yaml only: editorial cut to switch to before the render (ritim, sakin-luks, detay, lookbook); empty = signature"
+        type: string
+        default: ""
       device_name:
         description: "Small-screen check: simulator device type NAME for the iPhone, e.g. iPhone SE (3rd generation); empty = default"
         type: string
@@ -262,7 +266,7 @@ jobs:
             exit 0
           fi
           set +e
-          maestro --device "$UDID" test -e OUT=qa -e TEMPLATE="${{ inputs.template || 'campaign' }}" \
+          maestro --device "$UDID" test -e OUT=qa -e TEMPLATE="${{ inputs.template || 'campaign' }}" -e CUT="${{ inputs.cut }}" \
             -e ENTRY="${{ inputs.device_name == '' && 'sample' || 'picker' }}" \
             --test-output-dir "$GITHUB_WORKSPACE/shots" \
             --debug-output "$GITHUB_WORKSPACE/diag/maestro" \

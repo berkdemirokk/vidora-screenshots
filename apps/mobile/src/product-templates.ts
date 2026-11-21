@@ -241,11 +241,24 @@ export type SceneInput = {
 export type SceneTransition = {
   /**
    * blur: the previous scene grows, blurs and fades out with ghost copies over
-   * the new one; flash: hard cut with one white frame (duration ignored).
+   * the new one; flash: hard cut with one white frame (duration ignored);
+   * whip: both scenes slide fast along `direction` with motion blur peaking
+   * mid-transition (about 0.25 s). Needs the 1.2.0 native build.
    */
-  kind: "cut" | "push" | "wipe" | "zoom" | "blur" | "flash";
+  kind: "cut" | "push" | "wipe" | "zoom" | "blur" | "flash" | "whip";
   duration: number;
+  /** whip only: where the picture travels; default "left" (the new scene enters from the right). */
+  direction?: "left" | "right" | "up" | "down";
 };
+
+export const TRANSITION_KINDS: readonly string[] = ["cut", "push", "wipe", "zoom", "blur", "flash", "whip"];
+export const WHIP_DIRECTIONS: readonly string[] = ["left", "right", "up", "down"];
+
+/** A warm film-burn over the finished frame between `start` and `end` seconds. */
+export type LightLeak = { start: number; end: number; /** 0...1, default 0.6. */ strength?: number };
+
+/** A cards scene shows 2 to 4 photos. */
+export const MAX_CARDS = 4;
 
 /** Colour grade over the scenes (before texts); each -1...1, 0 = unchanged. */
 export type ProductGrade = {
@@ -270,8 +283,15 @@ export type ProductScene = {
    * scale = dolly 1...1.4, x/y = camera offset -1...1, rotation = roll as in
    * photo; yaw and opacity ignored). Falls back to a still photo when depth
    * is unavailable. Roll needs the 1.2.0 native build; older builds ignore it.
+   * cards: `images` (2 to 4 uris; `image` is the first) as rounded, bordered,
+   * slightly rotated cards over the scene background, entering one after the
+   * other, then drifting slowly; keys and shots are ignored. Needs the 1.2.0 native build.
    */
-  mode: "cutout" | "photo" | "depth";
+  mode: "cutout" | "photo" | "depth" | "cards";
+  /** Cards mode only: the card photos (2 to 4), counted with the 16-image limit. */
+  images?: string[];
+  /** Cards mode only: degrees clockwise per card, at most 12; default alternating about ±5. */
+  rotations?: number[];
   /** Times relative to the scene start. */
   keys: ProductKey[];
   /** Cutout mode only; default spec.background. */
@@ -318,6 +338,8 @@ export type ProductVideoSpec = {
   shots?: ProductShot[];
   /** Multi-scene video; absent = the single-product path. */
   scenes?: ProductScene[];
+  /** Warm light leaks over the finished frame (multi-scene videos); none = absent. */
+  leaks?: LightLeak[];
   /** Composite finishing; the renderer uses moderate defaults when absent. */
   look?: ProductLook;
   /** Multi-scene videos: colour grade; absent or all 0 = none. */
@@ -2869,6 +2891,7 @@ export function specProblems(spec: ProductVideoSpec): string[] {
   )
     out.push("music");
   if (spec.scenes) out.push(...sceneProblems(spec.scenes, d));
+  if (spec.leaks !== undefined) out.push(...leakProblems(spec.leaks, d));
   if (
     spec.grade !== undefined &&
     !(
@@ -2892,21 +2915,61 @@ function sceneProblems(scenes: ProductScene[], duration: number): string[] {
     else if (i === 0 ? sc.start !== 0 : sc.start <= scenes[i - 1].start)
       out.push("scenes order " + i);
     if (!sc.image) out.push(n + " image");
-    if (sc.mode !== "cutout" && sc.mode !== "photo" && sc.mode !== "depth")
+    if (!["cutout", "photo", "depth", "cards"].includes(sc.mode))
       out.push(n + " mode");
+    if (sc.mode === "cards") {
+      if (
+        !Array.isArray(sc.images) ||
+        sc.images.length < 2 ||
+        sc.images.length > MAX_CARDS ||
+        sc.images.some((u) => typeof u !== "string" || !u)
+      )
+        out.push(n + " cards images");
+      if (
+        sc.rotations !== undefined &&
+        (!Array.isArray(sc.rotations) ||
+          sc.rotations.length > MAX_CARDS ||
+          sc.rotations.some((r) => !fin(r) || Math.abs(r) > 12))
+      )
+        out.push(n + " cards rotations");
+    } else if (sc.images !== undefined || sc.rotations !== undefined)
+      out.push(n + " images");
     if (!Array.isArray(sc.keys)) out.push(n + " keys");
     if (
-      !["cut", "push", "wipe", "zoom", "blur", "flash"].includes(sc.transition?.kind) ||
+      !TRANSITION_KINDS.includes(sc.transition?.kind) ||
       !fin(sc.transition.duration) ||
       sc.transition.duration < 0 ||
-      sc.transition.duration > 1.5
+      sc.transition.duration > 1.5 ||
+      (sc.transition.direction !== undefined &&
+        !WHIP_DIRECTIONS.includes(sc.transition.direction))
     )
       out.push(n + " transition");
     if (sc.shade !== undefined && (!fin(sc.shade) || sc.shade < 0 || sc.shade > 1))
       out.push(n + " shade");
     if (splitBad(sc.background?.split)) out.push(n + " background split");
   });
+  const distinct = new Set(
+    scenes.flatMap((sc) => [sc.image, ...(Array.isArray(sc.images) ? sc.images : [])]),
+  );
+  if (distinct.size > 16) out.push("scenes images count");
   return out;
+}
+
+function leakProblems(leaks: LightLeak[], duration: number): string[] {
+  const bad =
+    !Array.isArray(leaks) ||
+    leaks.length > 4 ||
+    leaks.some(
+      (l) =>
+        !l ||
+        !fin(l.start) ||
+        !fin(l.end) ||
+        l.start < 0 ||
+        l.end <= l.start ||
+        l.end > duration ||
+        (l.strength !== undefined && (!fin(l.strength) || l.strength < 0 || l.strength > 1)),
+    );
+  return bad ? ["leaks"] : [];
 }
 
 /** A background split outside 0 <= split < 1 (absent is fine). */

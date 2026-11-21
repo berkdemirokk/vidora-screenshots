@@ -158,6 +158,30 @@ appId: com.berkdemirok.vidora
     visible:
       id: "render-button"
     timeout: 120000
+# With Pro, the sample starts a first video by itself (create.tsx ?sample=1)
+# and the text fields stay locked while it renders. Cancel it so the flow can
+# edit; the flow renders its own video at the end.
+- runFlow:
+    when:
+      true: ${output.entry == 'sample'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "render-cancel"
+          timeout: 20000
+          optional: true
+      - runFlow:
+          when:
+            visible:
+              id: "render-cancel"
+          commands:
+            - tapOn:
+                id: "render-cancel"
+                retryTapIfNoChange: false
+            - extendedWaitUntil:
+                notVisible:
+                  id: "render-cancel"
+                timeout: 60000
 # Şablon panel (all jobs), screenshot, then the optional template tile (discount|showcase).
 - tapOn:
     id: "tool-template"

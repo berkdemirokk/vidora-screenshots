@@ -287,7 +287,7 @@ test("Home: the Editoryal shelf comes first, picks up to 8 photos, sample opens 
   assert.match(gallery, /useEditorialPoster/);
   const posters = read("./gallery-posters.ts");
   assert.match(posters, /buildEditorialSpec\(/);
-  assert.match(posters, /EDITORIAL_POSTER_TIME/);
+  assert.match(posters, /at: cut\.poster/);
 });
 
 test("CI: qa_editorial input and the qa-editorial flow", () => {
